@@ -461,8 +461,9 @@ def fetch_sitemap_entries(
 def filter_news_entries(entries: List[Tuple[str, Optional[str]]]) -> List[Dict]:
     filtered: List[Dict] = []
     for link, lastmod in entries:
-        lower = link.lower()
-        if any(lower.endswith(ext) for ext in IMAGE_EXTENSIONS):
+        parsed = urlparse(link)
+        path_lower = parsed.path.lower()
+        if any(path_lower.endswith(ext) for ext in IMAGE_EXTENSIONS):
             continue
         dt = parse_datetime(lastmod) if lastmod else None
         filtered.append(
@@ -533,26 +534,32 @@ def news_loop(
         if not sitemap_urls or now - last_refresh > config.sitemap_refresh_seconds:
             sitemap_urls = load_sitemap_list(config, session, force_refresh=True)
             last_refresh = now
-        entries = fetch_sitemap_entries(
-            sitemap_urls, session, timeout=config.http_timeout_seconds
-        )
-        news_items = filter_news_entries(entries)
-        sent_now = 0
-        for entry in news_items:
-            link = entry["link"]
-            with lock:
-                if link in sent_news:
-                    continue
-                sent_news.add(link)
-            send_telegram_message(
-                session, config.telegram_token, config.telegram_chat_id, build_news_message(entry)
+        total_sent = 0
+        for sitemap_url in sitemap_urls:
+            entries = fetch_sitemap_entries(
+                [sitemap_url], session, timeout=config.http_timeout_seconds
             )
-            sent_now += 1
-            if sent_now >= config.news_limit:
-                break
-        if sent_now:
+            news_items = filter_news_entries(entries)
+            sent_for_site = 0
+            for entry in news_items:
+                link = entry["link"]
+                with lock:
+                    if link in sent_news:
+                        continue
+                    sent_news.add(link)
+                send_telegram_message(
+                    session,
+                    config.telegram_token,
+                    config.telegram_chat_id,
+                    build_news_message(entry),
+                )
+                sent_for_site += 1
+                total_sent += 1
+                if sent_for_site >= config.news_limit:
+                    break
+        if total_sent:
             store.save_set(config.s3_sent_news_key, config.news_sent_file, sent_news)
-        log(f"news cycle fetched={len(news_items)} sent={sent_now}")
+        log(f"news cycle sites={len(sitemap_urls)} sent={total_sent}")
         stop_event.wait(config.sitemap_check_seconds)
 
 
