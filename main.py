@@ -534,32 +534,32 @@ def news_loop(
         if not sitemap_urls or now - last_refresh > config.sitemap_refresh_seconds:
             sitemap_urls = load_sitemap_list(config, session, force_refresh=True)
             last_refresh = now
-        total_sent = 0
-        for sitemap_url in sitemap_urls:
-            entries = fetch_sitemap_entries(
-                [sitemap_url], session, timeout=config.http_timeout_seconds
+        entries = fetch_sitemap_entries(
+            sitemap_urls, session, timeout=config.http_timeout_seconds
+        )
+        news_items = filter_news_entries(entries)
+        latest_items = (
+            news_items[: config.news_limit] if config.news_limit else news_items
+        )
+        sent_now = 0
+        for entry in latest_items:
+            link = entry["link"]
+            with lock:
+                if link in sent_news:
+                    continue
+                sent_news.add(link)
+            send_telegram_message(
+                session,
+                config.telegram_token,
+                config.telegram_chat_id,
+                build_news_message(entry),
             )
-            news_items = filter_news_entries(entries)
-            sent_for_site = 0
-            for entry in news_items:
-                link = entry["link"]
-                with lock:
-                    if link in sent_news:
-                        continue
-                    sent_news.add(link)
-                send_telegram_message(
-                    session,
-                    config.telegram_token,
-                    config.telegram_chat_id,
-                    build_news_message(entry),
-                )
-                sent_for_site += 1
-                total_sent += 1
-                if sent_for_site >= config.news_limit:
-                    break
-        if total_sent:
+            sent_now += 1
+        if sent_now:
             store.save_set(config.s3_sent_news_key, config.news_sent_file, sent_news)
-        log(f"news cycle sites={len(sitemap_urls)} sent={total_sent}")
+        log(
+            f"news cycle sites={len(sitemap_urls)} latest_checked={len(latest_items)} sent={sent_now}"
+        )
         stop_event.wait(config.sitemap_check_seconds)
 
 
