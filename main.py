@@ -80,6 +80,7 @@ class Config:
     sent_urls_file: str
     news_sent_file: str
     news_limit: int
+    news_max_age_hours: int
     sitemap_list_url: str
     sitemap_list_file: str
     sitemap_check_seconds: int
@@ -111,6 +112,7 @@ class Config:
             sent_urls_file=os.environ.get("SENT_URLS_FILE", "sent_urls.txt"),
             news_sent_file=os.environ.get("NEWS_SENT_FILE", "sent_news.txt"),
             news_limit=str_to_int(os.environ.get("NEWS_LIMIT"), 10),
+            news_max_age_hours=str_to_int(os.environ.get("NEWS_MAX_AGE_HOURS"), 72),
             sitemap_list_url=os.environ.get(
                 "SITEMAP_LIST_URL", "https://cdn.resimx.com.tr/sitemap.txt"
             ),
@@ -458,14 +460,19 @@ def fetch_sitemap_entries(
     return collected
 
 
-def filter_news_entries(entries: List[Tuple[str, Optional[str]]]) -> List[Dict]:
+def filter_news_entries(
+    entries: List[Tuple[str, Optional[str]]], max_age_hours: int
+) -> List[Dict]:
     filtered: List[Dict] = []
+    now = datetime.now(ISTANBUL_TZ)
     for link, lastmod in entries:
         parsed = urlparse(link)
         path_lower = parsed.path.lower()
         if any(path_lower.endswith(ext) for ext in IMAGE_EXTENSIONS):
             continue
         dt = parse_datetime(lastmod) if lastmod else None
+        if dt and max_age_hours and (now - dt).total_seconds() > max_age_hours * 3600:
+            continue
         filtered.append(
             {
                 "link": link,
@@ -537,7 +544,7 @@ def news_loop(
         entries = fetch_sitemap_entries(
             sitemap_urls, session, timeout=config.http_timeout_seconds
         )
-        news_items = filter_news_entries(entries)
+        news_items = filter_news_entries(entries, config.news_max_age_hours)
         latest_items = (
             news_items[: config.news_limit] if config.news_limit else news_items
         )
