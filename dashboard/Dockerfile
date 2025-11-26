@@ -3,7 +3,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .
-RUN npm run build
+# Use npx to avoid execute-bit issues on local bin
+RUN npx vite build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
