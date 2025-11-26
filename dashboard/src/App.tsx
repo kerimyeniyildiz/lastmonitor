@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link, Routes, Route, useLocation } from "react-router-dom";
 import {
   fetchDailyStats,
   fetchNews,
@@ -70,9 +71,7 @@ function TweetList({ tweets }: { tweets: Tweet[] }) {
             <a href={tweet.link} target="_blank" rel="noreferrer">
               Tweeti aç
             </a>
-            {tweet.user_handle && (
-              <span className="muted">@{tweet.user_handle}</span>
-            )}
+            {tweet.user_handle && <span className="muted">@{tweet.user_handle}</span>}
           </div>
         </article>
       ))}
@@ -137,6 +136,7 @@ function QueryPie({ data }: { data: QueryStat[] }) {
 }
 
 export default function App() {
+  const location = useLocation();
   const [queryFilter, setQueryFilter] = useState<string>("");
   const [search, setSearch] = useState<string>("");
 
@@ -190,109 +190,254 @@ export default function App() {
           <p className="muted">lastmonitor</p>
           <h1>Dashboard</h1>
         </div>
-        <div className="filters">
-          <select
-            value={queryFilter}
-            onChange={(e) => setQueryFilter(e.target.value)}
-            className="input"
-          >
-            <option value="">Tüm sorgular</option>
-            {queries.map((q) => (
-              <option key={q} value={q}>
-                {q}
-              </option>
-            ))}
-          </select>
-          <input
-            className="input"
-            placeholder="Metinde ara"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button className="btn ghost" onClick={() => tweetsQuery.refetch()}>
-            Yenile
-          </button>
-        </div>
+        <nav className="nav">
+          <Link className={location.pathname === "/" ? "nav-link active" : "nav-link"} to="/">
+            Analiz
+          </Link>
+          <Link className={location.pathname === "/live" ? "nav-link active" : "nav-link"} to="/live">
+            Live Feed
+          </Link>
+        </nav>
       </header>
 
-      <div className="stats-row">
-        <StatCard label="Toplam Tweet" value={stats.totalTweets} hint="Son sorgu seti" />
-        <StatCard label="Sorgu Çeşidi" value={stats.uniqueQueries} />
-        <StatCard label="Son Tweet" value={stats.lastFetched || "-"} />
-        <StatCard label="Son Haber" value={stats.lastNews || "-"} />
-      </div>
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <>
+              <div className="filters">
+                <select
+                  value={queryFilter}
+                  onChange={(e) => setQueryFilter(e.target.value)}
+                  className="input"
+                >
+                  <option value="">Tüm sorgular</option>
+                  {queries.map((q) => (
+                    <option key={q} value={q}>
+                      {q}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="input"
+                  placeholder="Metinde ara"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <button className="btn ghost" onClick={() => tweetsQuery.refetch()}>
+                  Yenile
+                </button>
+              </div>
 
-      <div className="grid">
-        <Section title="Günlük Tweet Adedi (14g)">
-          {dailyQuery.isLoading ? (
-            <p className="muted">Yükleniyor...</p>
-          ) : (
-            <DailyChart data={dailyQuery.data || []} />
-          )}
-        </Section>
+              <div className="stats-row">
+                <StatCard label="Toplam Tweet" value={stats.totalTweets} hint="Son sorgu seti" />
+                <StatCard label="Sorgu Çeşidi" value={stats.uniqueQueries} />
+                <StatCard label="Son Tweet" value={stats.lastFetched || "-"} />
+                <StatCard label="Son Haber" value={stats.lastNews || "-"} />
+              </div>
 
-        <Section title="Sorgu Dağılımı">
-          {topQueries.isLoading ? (
-            <p className="muted">Yükleniyor...</p>
-          ) : (
-            <QueryPie data={topQueries.data || []} />
-          )}
-        </Section>
-      </div>
+              <div className="grid">
+                <Section title="Günlük Tweet Adedi (14g)">
+                  {dailyQuery.isLoading ? (
+                    <p className="muted">Yükleniyor...</p>
+                  ) : (
+                    <DailyChart data={dailyQuery.data || []} />
+                  )}
+                </Section>
 
-      <div className="grid">
-        <Section title="Son 50 Tweet Zaman Çizelgesi">
-          {timeline.length === 0 ? (
-            <p className="muted">Veri yok</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart
-                data={timeline.map((t, i) => ({ name: i + 1, query: t.query, value: 1 }))}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Area type="monotone" dataKey="value" stroke="#2563eb" fill="url(#colorGradient)" />
-                <defs>
-                  <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
-                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </Section>
-      </div>
+                <Section title="Sorgu Dağılımı">
+                  {topQueries.isLoading ? (
+                    <p className="muted">Yükleniyor...</p>
+                  ) : (
+                    <QueryPie data={topQueries.data || []} />
+                  )}
+                </Section>
+              </div>
 
-      <div className="grid">
-        <Section title="Son Tweetler">
-          {tweetsQuery.isLoading && <p className="muted">Yükleniyor...</p>}
-          {tweetsQuery.error && (
-            <p className="error">Hata: {(tweetsQuery.error as Error).message}</p>
-          )}
-          {recentTweets.length === 0 && !tweetsQuery.isLoading ? (
-            <p className="muted">Kayıt yok</p>
-          ) : (
-            <TweetList tweets={recentTweets} />
-          )}
-        </Section>
+              <div className="grid">
+                <Section title="Son 50 Tweet Zaman Çizelgesi">
+                  {timeline.length === 0 ? (
+                    <p className="muted">Veri yok</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart
+                        data={timeline.map((t, i) => ({ name: i + 1, query: t.query, value: 1 }))}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="value" stroke="#2563eb" fill="url(#colorGradient)" />
+                        <defs>
+                          <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
+                </Section>
+              </div>
 
-        <Section title="Son Haberler">
-          {newsQuery.isLoading && <p className="muted">Yükleniyor...</p>}
-          {newsQuery.error && <p className="error">Hata: {(newsQuery.error as Error).message}</p>}
-          {recentNews.length === 0 && !newsQuery.isLoading ? (
-            <p className="muted">Kayıt yok</p>
-          ) : (
-            <NewsList items={recentNews} />
-          )}
-        </Section>
-      </div>
+              <div className="grid">
+                <Section title="Son Tweetler">
+                  {tweetsQuery.isLoading && <p className="muted">Yükleniyor...</p>}
+                  {tweetsQuery.error && (
+                    <p className="error">Hata: {(tweetsQuery.error as Error).message}</p>
+                  )}
+                  {recentTweets.length === 0 && !tweetsQuery.isLoading ? (
+                    <p className="muted">Kayıt yok</p>
+                  ) : (
+                    <TweetList tweets={recentTweets} />
+                  )}
+                </Section>
+
+                <Section title="Son Haberler">
+                  {newsQuery.isLoading && <p className="muted">Yükleniyor...</p>}
+                  {newsQuery.error && <p className="error">Hata: {(newsQuery.error as Error).message}</p>}
+                  {recentNews.length === 0 && !newsQuery.isLoading ? (
+                    <p className="muted">Kayıt yok</p>
+                  ) : (
+                    <NewsList items={recentNews} />
+                  )}
+                </Section>
+              </div>
+            </>
+          }
+        />
+        <Route path="/live" element={<LiveFeed />} />
+      </Routes>
 
       <footer className="footer">
         <p className="muted">API: {import.meta.env.VITE_API_BASE_URL || "tanımlanmadı"}</p>
       </footer>
     </div>
+  );
+}
+
+function LiveFeed() {
+  const [filter, setFilter] = useState<{ type: "site" | "place" | "person" | "all"; value?: string }>({
+    type: "all",
+  });
+  const tweets = useQuery({ queryKey: ["live", "tweets"], queryFn: () => fetchTweets() });
+  const news = useQuery({ queryKey: ["live", "news"], queryFn: fetchNews });
+
+  const entries = useMemo(() => {
+    const items: Array<{
+      kind: "tweet" | "news";
+      text: string;
+      link: string;
+      ts: string;
+      meta: string;
+    }> = [];
+    (tweets.data || []).forEach((t) =>
+      items.push({
+        kind: "tweet",
+        text: t.text,
+        link: t.link,
+        ts: t.tweet_created_at || t.fetched_at,
+        meta: `${t.user_name} • ${t.query}`,
+      })
+    );
+    (news.data || []).forEach((n) =>
+      items.push({
+        kind: "news",
+        text: n.link,
+        link: n.link,
+        ts: n.news_created_at || n.fetched_at,
+        meta: n.source || "Haber",
+      })
+    );
+    const normalize = (v?: string) => (v || "").toLowerCase();
+    const filtered = items.filter((it) => {
+      if (filter.type === "all") return true;
+      const val = normalize(filter.value);
+      if (!val) return true;
+      if (filter.type === "site") return normalize(it.meta).includes(val) || normalize(it.text).includes(val);
+      if (filter.type === "place" || filter.type === "person") {
+        return normalize(it.text).includes(val) || normalize(it.meta).includes(val);
+      }
+      return true;
+    });
+    filtered.sort((a, b) => (new Date(b.ts).getTime() || 0) - (new Date(a.ts).getTime() || 0));
+    return filtered.slice(0, 10);
+  }, [tweets.data, news.data, filter]);
+
+  const sites = ["onadimgazetesi.com", "alternatifgazetesi.com"];
+  const places = ["Kırklareli", "Lüleburgaz", "Babaeski", "Pınarhisar", "Kofçaz", "Demirköy", "Pehlivanköy"];
+  const persons = ["Bosuna Tıklama", "Kırklareli Valiliği", "Kırklareli Emniyet Müdürlüğü", "Ali Yerlikaya"];
+
+  return (
+    <>
+      <div className="filters wrap">
+        <div className="pill-group">
+          <span className="muted small">Haber Siteleri</span>
+          {sites.map((s) => (
+            <button
+              key={s}
+              className={`btn ghost ${filter.type === "site" && filter.value === s ? "active" : ""}`}
+              onClick={() => setFilter({ type: "site", value: s })}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <div className="pill-group">
+          <span className="muted small">Yerler</span>
+          {places.map((s) => (
+            <button
+              key={s}
+              className={`btn ghost ${filter.type === "place" && filter.value === s ? "active" : ""}`}
+              onClick={() => setFilter({ type: "place", value: s })}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <div className="pill-group">
+          <span className="muted small">Kişiler</span>
+          {persons.map((s) => (
+            <button
+              key={s}
+              className={`btn ghost ${filter.type === "person" && filter.value === s ? "active" : ""}`}
+              onClick={() => setFilter({ type: "person", value: s })}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <button className="btn" onClick={() => setFilter({ type: "all" })}>
+          Hepsi
+        </button>
+      </div>
+
+      <Section title="Live Feed (Son 10)">
+        {(tweets.isLoading || news.isLoading) && <p className="muted">Yükleniyor...</p>}
+        {(tweets.error || news.error) && (
+          <p className="error">
+            Hata: {(tweets.error as Error)?.message || (news.error as Error)?.message || "Bilinmiyor"}
+          </p>
+        )}
+        <div className="list">
+          {entries.map((e, idx) => (
+            <article key={`${e.link}-${idx}`} className="item">
+              <div className="meta">
+                <span className="pill">{e.kind === "news" ? "Haber" : "Tweet"}</span>
+                <span className="muted small">{e.ts}</span>
+              </div>
+              <p className="truncate">{e.text}</p>
+              <div className="links">
+                <a href={e.link} target="_blank" rel="noreferrer">
+                  Aç
+                </a>
+                <span className="muted small">{e.meta}</span>
+              </div>
+            </article>
+          ))}
+          {entries.length === 0 && !(tweets.isLoading || news.isLoading) && <p className="muted">Kayıt yok</p>}
+        </div>
+      </Section>
+    </>
   );
 }
