@@ -69,6 +69,71 @@ def str_to_int(value: Optional[str], default: int) -> int:
 
 
 @dataclass
+class QuerySchedule:
+    query: str
+    interval_seconds: int
+
+
+def parse_duration_seconds(text: Optional[str], default: int) -> int:
+    """Parse durations like '30m', '5m', '60', '1h' into seconds."""
+    if text is None:
+        return default
+    raw = str(text).strip().lower()
+    if not raw:
+        return default
+    multiplier = 1
+    if raw.endswith("h"):
+        multiplier = 3600
+        raw = raw[:-1]
+    elif raw.endswith("m"):
+        multiplier = 60
+        raw = raw[:-1]
+    elif raw.endswith("s"):
+        multiplier = 1
+        raw = raw[:-1]
+    try:
+        return max(1, int(raw) * multiplier)
+    except ValueError:
+        return default
+
+
+def parse_query_schedule(
+    raw: Optional[str], fallback_query: str, fallback_interval: int
+) -> List[QuerySchedule]:
+    """
+    Parse a schedule definition like:
+    QUERY_SCHEDULE="Kofcaz|30m,Kirklareli|1m,Babaeski|1800"
+    Delimiters: comma between items, '|' or ':' between query and interval.
+    """
+    if fallback_interval <= 0:
+        fallback_interval = 60
+    schedule: List[QuerySchedule] = []
+    text = (raw or "").strip()
+    if text:
+        for part in text.split(","):
+            item = part.strip()
+            if not item:
+                continue
+            query_text, interval_text = item, str(fallback_interval)
+            if "|" in item:
+                query_text, interval_text = item.split("|", 1)
+            elif ":" in item:
+                query_text, interval_text = item.split(":", 1)
+            query_clean = query_text.strip()
+            if not query_clean:
+                continue
+            interval_seconds = parse_duration_seconds(interval_text, fallback_interval)
+            schedule.append(
+                QuerySchedule(query=query_clean, interval_seconds=interval_seconds)
+            )
+    if not schedule and fallback_query:
+        schedule.append(
+            QuerySchedule(query=fallback_query, interval_seconds=fallback_interval)
+        )
+    return schedule
+
+
+@dataclass
 class Config:
     api_key: str
     query: str
@@ -96,17 +161,19 @@ class Config:
     s3_bucket: str
     s3_sent_urls_key: str
     s3_sent_news_key: str
+    queries_schedule: List[QuerySchedule]
 
     @classmethod
     def from_env(cls) -> "Config":
+        default_query = os.environ.get("QUERY", "Kırklareli")
+        default_interval = str_to_int(os.environ.get("POLL_INTERVAL_SECONDS"), 300)
+        schedule_raw = os.environ.get("QUERY_SCHEDULE")
         return cls(
             api_key=os.environ.get("API_KEY", ""),
-            query=os.environ.get("QUERY", "Kırklareli"),
+            query=default_query,
             query_type=os.environ.get("QUERY_TYPE", "Latest"),
             tweet_limit=str_to_int(os.environ.get("TWEET_LIMIT"), 20),
-            poll_interval_seconds=str_to_int(
-                os.environ.get("POLL_INTERVAL_SECONDS"), 300
-            ),
+            poll_interval_seconds=default_interval,
             telegram_token=os.environ.get("TELEGRAM_TOKEN", ""),
             telegram_chat_id=os.environ.get("TELEGRAM_CHAT_ID", ""),
             sent_urls_file=os.environ.get("SENT_URLS_FILE", "sent_urls.txt"),
@@ -136,6 +203,9 @@ class Config:
             s3_bucket=os.environ.get("S3_BUCKET", ""),
             s3_sent_urls_key=os.environ.get("S3_SENT_URLS_KEY", "sent_urls.txt"),
             s3_sent_news_key=os.environ.get("S3_SENT_NEWS_KEY", "sent_news.txt"),
+            queries_schedule=parse_query_schedule(
+                schedule_raw, default_query, default_interval
+            ),
         )
 
 
@@ -347,9 +417,11 @@ def send_telegram_message(
         log("telegram send ok")
 
 
-def fetch_latest_tweets(config: Config, session: requests.Session) -> List[Dict]:
+def fetch_latest_tweets(
+    config: Config, session: requests.Session, search_query: str
+) -> List[Dict]:
     url = "https://twitter-api45.p.rapidapi.com/search.php"
-    params = {"query": config.query, "search_type": config.query_type}
+    params = {"query": search_query, "search_type": config.query_type}
     headers = {
         "x-rapidapi-key": config.api_key,
         "x-rapidapi-host": "twitter-api45.p.rapidapi.com",
@@ -366,7 +438,7 @@ def fetch_latest_tweets(config: Config, session: requests.Session) -> List[Dict]
     tweets = extract_tweets(payload)
     if config.tweet_limit and len(tweets) > config.tweet_limit:
         tweets = tweets[: config.tweet_limit]
-    log(f"tweets fetched={len(tweets)}")
+    log(f"tweets fetched={len(tweets)} query='{search_query}'")
     return tweets
 
 
@@ -504,26 +576,48 @@ def tweet_loop(
     lock: threading.Lock,
     stop_event: threading.Event,
 ) -> None:
+    schedule = config.queries_schedule or [
+        QuerySchedule(config.query, config.poll_interval_seconds)
+    ]
+    next_run: Dict[str, float] = {item.query: 0.0 for item in schedule}
     while not stop_event.is_set():
         try:
-            tweets = fetch_latest_tweets(config, session)
-            new_count = 0
-            for tweet in tweets:
-                link = tweet["link"]
-                with lock:
-                    if link in sent_links:
-                        continue
-                    sent_links.add(link)
-                send_telegram_message(
-                    session, config.telegram_token, config.telegram_chat_id, build_tweet_message(tweet)
+            now = time.time()
+            for item in schedule:
+                due_at = next_run.get(item.query, 0)
+                if now < due_at:
+                    continue
+                tweets = fetch_latest_tweets(config, session, item.query)
+                new_count = 0
+                for tweet in tweets:
+                    link = tweet["link"]
+                    with lock:
+                        if link in sent_links:
+                            continue
+                        sent_links.add(link)
+                    send_telegram_message(
+                        session,
+                        config.telegram_token,
+                        config.telegram_chat_id,
+                        build_tweet_message(tweet),
+                    )
+                    new_count += 1
+                if new_count:
+                    store.save_set(
+                        config.s3_sent_urls_key, config.sent_urls_file, sent_links
+                    )
+                log(
+                    f"tweets cycle query='{item.query}' fetched={len(tweets)} sent={new_count}"
                 )
-                new_count += 1
-            if new_count:
-                store.save_set(config.s3_sent_urls_key, config.sent_urls_file, sent_links)
-            log(f"tweets cycle fetched={len(tweets)} sent={new_count}")
+                next_run[item.query] = now + max(1, item.interval_seconds)
         except Exception as exc:  # pylint: disable=broad-except
             log(f"tweets unexpected error: {exc}")
-        stop_event.wait(config.poll_interval_seconds)
+        # Sleep until the soonest next run, but wake periodically to allow shutdown.
+        if next_run:
+            sleep_for = max(1.0, min(next_run.values()) - time.time())
+        else:
+            sleep_for = max(1.0, config.poll_interval_seconds)
+        stop_event.wait(sleep_for)
 
 
 def news_loop(
@@ -616,3 +710,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
