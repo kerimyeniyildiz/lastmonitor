@@ -16,3 +16,7 @@ env/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Frontend
+dashboard/node_modules/
+dashboard/dist/

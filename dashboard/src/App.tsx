@@ -24,7 +24,7 @@ import {
   Area,
 } from "recharts";
 
-const COLORS = ["#2563eb", "#ea580c", "#16a34a", "#9333ea", "#0891b2", "#f59e0b"];
+const COLORS = ["#2563eb", "#0891b2", "#0ea5e9", "#4f46e5", "#7c3aed", "#db2777"];
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -253,7 +253,13 @@ export default function App() {
                 <XAxis dataKey="name" />
                 <YAxis allowDecimals={false} />
                 <Tooltip />
-                <Area type="monotone" dataKey="value" stroke="#2563eb" fill="#2563eb33" />
+                <Area type="monotone" dataKey="value" stroke="#2563eb" fill="url(#colorGradient)" />
+                <defs>
+                  <linearGradient id="colorGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563eb" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
               </AreaChart>
             </ResponsiveContainer>
           )}
