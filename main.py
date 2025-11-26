@@ -15,6 +15,7 @@ from botocore.exceptions import ClientError
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+import psycopg2
 
 
 IMAGE_EXTENSIONS = (
@@ -162,6 +163,7 @@ class Config:
     s3_sent_urls_key: str
     s3_sent_news_key: str
     queries_schedule: List[QuerySchedule]
+    db_url: str
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -206,6 +208,7 @@ class Config:
             queries_schedule=parse_query_schedule(
                 schedule_raw, default_query, default_interval
             ),
+            db_url=os.environ.get("DB_URL", ""),
         )
 
 
@@ -222,6 +225,114 @@ def build_http_session(config: Config) -> requests.Session:
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     return session
+
+
+class DBClient:
+    """Lightweight Postgres client for persisting tweets/news."""
+
+    def __init__(self, db_url: str):
+        self.db_url = db_url
+        self.conn = None
+        self.enabled = bool(db_url)
+        if not self.enabled:
+            return
+        self._ensure_connection()
+        self.ensure_tables()
+
+    def _ensure_connection(self) -> None:
+        if not self.enabled:
+            return
+        if self.conn and not self.conn.closed:
+            return
+        try:
+            self.conn = psycopg2.connect(self.db_url, connect_timeout=5)
+            self.conn.autocommit = True
+        except Exception as exc:  # pylint: disable=broad-except
+            log(f"db connect failed: {exc}")
+            self.enabled = False
+
+    def ensure_tables(self) -> None:
+        if not self.enabled:
+            return
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS tweets (
+                        id SERIAL PRIMARY KEY,
+                        tweet_id TEXT,
+                        query TEXT,
+                        user_handle TEXT,
+                        user_name TEXT,
+                        text TEXT,
+                        link TEXT UNIQUE,
+                        tweet_created_at TIMESTAMPTZ,
+                        fetched_at TIMESTAMPTZ DEFAULT NOW()
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_tweets_query_created_at
+                        ON tweets (query, tweet_created_at DESC);
+                    CREATE TABLE IF NOT EXISTS news (
+                        id SERIAL PRIMARY KEY,
+                        link TEXT UNIQUE,
+                        source TEXT,
+                        news_created_at TIMESTAMPTZ,
+                        fetched_at TIMESTAMPTZ DEFAULT NOW()
+                    );
+                    """
+                )
+        except Exception as exc:  # pylint: disable=broad-except
+            log(f"db ensure tables failed: {exc}")
+            self.enabled = False
+
+    def insert_tweet(self, tweet: Dict, query: str) -> None:
+        if not self.enabled:
+            return
+        self._ensure_connection()
+        if not self.enabled:
+            return
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO tweets (tweet_id, query, user_handle, user_name, text, link, tweet_created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (link) DO NOTHING;
+                    """,
+                    (
+                        tweet.get("id"),
+                        query,
+                        tweet.get("user_handle"),
+                        tweet.get("user_name"),
+                        tweet.get("text"),
+                        tweet.get("link"),
+                        parse_datetime(tweet.get("created_at")),
+                    ),
+                )
+        except Exception as exc:  # pylint: disable=broad-except
+            log(f"db insert tweet failed: {exc}")
+
+    def insert_news(self, entry: Dict) -> None:
+        if not self.enabled:
+            return
+        self._ensure_connection()
+        if not self.enabled:
+            return
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO news (link, source, news_created_at)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (link) DO NOTHING;
+                    """,
+                    (
+                        entry.get("link"),
+                        urlparse(entry.get("link", "")).netloc,
+                        parse_datetime(entry.get("created_at")),
+                    ),
+                )
+        except Exception as exc:  # pylint: disable=broad-except
+            log(f"db insert news failed: {exc}")
 
 
 class R2Store:
@@ -603,6 +714,7 @@ def tweet_loop(
     config: Config,
     session: requests.Session,
     store: R2Store,
+    db: DBClient,
     sent_links: Set[str],
     lock: threading.Lock,
     stop_event: threading.Event,
@@ -633,6 +745,7 @@ def tweet_loop(
                         build_tweet_message(tweet),
                     )
                     log(f"tweet sent link={link}")
+                    db.insert_tweet(tweet, item.query)
                     new_count += 1
                 if new_count:
                     store.save_set(
@@ -656,6 +769,7 @@ def news_loop(
     config: Config,
     session: requests.Session,
     store: R2Store,
+    db: DBClient,
     sent_news: Set[str],
     lock: threading.Lock,
     stop_event: threading.Event,
@@ -688,6 +802,7 @@ def news_loop(
                 build_news_message(entry),
             )
             log(f"news sent link={link}")
+            db.insert_news(entry)
             sent_now += 1
         if sent_now:
             store.save_set(config.s3_sent_news_key, config.news_sent_file, sent_news)
@@ -712,6 +827,7 @@ def main() -> None:
     validate_config(config)
     session = build_http_session(config)
     store = R2Store(config)
+    db = DBClient(config.db_url)
     sent_tweets = store.load_set(config.s3_sent_urls_key, config.sent_urls_file)
     sent_news = store.load_set(config.s3_sent_news_key, config.news_sent_file)
     tweet_lock = threading.Lock()
@@ -720,12 +836,12 @@ def main() -> None:
     log("service start")
     tweet_thread = threading.Thread(
         target=tweet_loop,
-        args=(config, session, store, sent_tweets, tweet_lock, stop_event),
+        args=(config, session, store, db, sent_tweets, tweet_lock, stop_event),
         daemon=True,
     )
     news_thread = threading.Thread(
         target=news_loop,
-        args=(config, session, store, sent_news, news_lock, stop_event),
+        args=(config, session, store, db, sent_news, news_lock, stop_event),
         daemon=True,
     )
     tweet_thread.start()
