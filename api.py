@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import psycopg2
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 
@@ -55,6 +56,15 @@ def get_token_header(authorization: Optional[str] = Header(None)) -> None:
 
 
 app = FastAPI(title="lastmonitor API", version="0.1.0")
+
+# Allow dashboard/frontend to call the API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
