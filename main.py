@@ -622,21 +622,22 @@ def tweet_loop(
                 new_count = 0
                 for tweet in tweets:
                     link = tweet["link"]
-                    with lock:
-                        if link in sent_links:
-                            continue
-                        sent_links.add(link)
-                    send_telegram_message(
-                        session,
-                        config.telegram_token,
-                        config.telegram_chat_id,
-                        build_tweet_message(tweet),
-                    )
-                    new_count += 1
-                if new_count:
-                    store.save_set(
-                        config.s3_sent_urls_key, config.sent_urls_file, sent_links
-                    )
+                with lock:
+                    if link in sent_links:
+                        continue
+                    sent_links.add(link)
+                send_telegram_message(
+                    session,
+                    config.telegram_token,
+                    config.telegram_chat_id,
+                    build_tweet_message(tweet),
+                )
+                log(f"tweet sent link={link}")
+                new_count += 1
+            if new_count:
+                store.save_set(
+                    config.s3_sent_urls_key, config.sent_urls_file, sent_links
+                )
                 log(
                     f"tweets cycle query='{item.query}' fetched={len(tweets)} sent={new_count}"
                 )
@@ -686,6 +687,7 @@ def news_loop(
                 config.telegram_chat_id,
                 build_news_message(entry),
             )
+            log(f"news sent link={link}")
             sent_now += 1
         if sent_now:
             store.save_set(config.s3_sent_news_key, config.news_sent_file, sent_news)
