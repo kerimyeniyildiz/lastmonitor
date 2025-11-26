@@ -137,6 +137,12 @@ a:hover {
   box-shadow: 0 4px 6px -1px var(--accent-glow);
 }
 
+.btn.active {
+  border: 1px solid var(--border);
+  background: var(--accent-glow);
+  color: var(--heading);
+}
+
 .btn:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 8px -1px var(--accent-glow);
@@ -333,14 +339,15 @@ a:hover {
     align-items: stretch;
   }
 
-.grid {
-  grid-template-columns: 1fr;
+  .grid {
+    grid-template-columns: 1fr;
   }
 }
 
 .nav {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .nav-link {
