@@ -622,26 +622,26 @@ def tweet_loop(
                 new_count = 0
                 for tweet in tweets:
                     link = tweet["link"]
-                with lock:
-                    if link in sent_links:
-                        continue
-                    sent_links.add(link)
-                send_telegram_message(
-                    session,
-                    config.telegram_token,
-                    config.telegram_chat_id,
-                    build_tweet_message(tweet),
-                )
-                log(f"tweet sent link={link}")
-                new_count += 1
-            if new_count:
-                store.save_set(
-                    config.s3_sent_urls_key, config.sent_urls_file, sent_links
-                )
+                    with lock:
+                        if link in sent_links:
+                            continue
+                        sent_links.add(link)
+                    send_telegram_message(
+                        session,
+                        config.telegram_token,
+                        config.telegram_chat_id,
+                        build_tweet_message(tweet),
+                    )
+                    log(f"tweet sent link={link}")
+                    new_count += 1
+                if new_count:
+                    store.save_set(
+                        config.s3_sent_urls_key, config.sent_urls_file, sent_links
+                    )
                 log(
                     f"tweets cycle query='{item.query}' fetched={len(tweets)} sent={new_count}"
                 )
-                next_run[item.query] = now + max(1, item.interval_seconds)
+                next_run[item.query] = time.time() + max(1, item.interval_seconds)
         except Exception as exc:  # pylint: disable=broad-except
             log(f"tweets unexpected error: {exc}")
         # Sleep until the soonest next run, but wake periodically to allow shutdown.
