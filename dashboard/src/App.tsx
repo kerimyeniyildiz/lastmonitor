@@ -20,6 +20,8 @@ import {
   PieChart,
   Pie,
   Cell,
+  AreaChart,
+  Area,
 } from "recharts";
 
 const COLORS = ["#2563eb", "#ea580c", "#16a34a", "#9333ea", "#0891b2", "#f59e0b"];
@@ -32,6 +34,24 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       </div>
       {children}
     </section>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
+  return (
+    <div className="stat-card">
+      <p className="muted">{label}</p>
+      <h3>{value}</h3>
+      {hint && <span className="muted small">{hint}</span>}
+    </div>
   );
 }
 
@@ -145,6 +165,24 @@ export default function App() {
     return Array.from(set);
   }, [tweetsQuery.data]);
 
+  const stats = useMemo(() => {
+    const totalTweets = tweetsQuery.data?.length || 0;
+    const uniqueQueries = new Set((tweetsQuery.data || []).map((t) => t.query)).size;
+    const lastFetched = tweetsQuery.data?.[0]?.fetched_at || tweetsQuery.data?.[0]?.tweet_created_at;
+    const lastNews = newsQuery.data?.[0]?.fetched_at || newsQuery.data?.[0]?.news_created_at;
+    return { totalTweets, uniqueQueries, lastFetched, lastNews };
+  }, [tweetsQuery.data, newsQuery.data]);
+
+  const timeline = useMemo(() => {
+    if (!tweetsQuery.data) return [];
+    return tweetsQuery.data
+      .map((t) => ({
+        ts: t.tweet_created_at || t.fetched_at,
+        query: t.query,
+      }))
+      .slice(0, 50);
+  }, [tweetsQuery.data]);
+
   return (
     <div className="page">
       <header className="header">
@@ -171,16 +209,54 @@ export default function App() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          <button className="btn ghost" onClick={() => tweetsQuery.refetch()}>
+            Yenile
+          </button>
         </div>
       </header>
 
+      <div className="stats-row">
+        <StatCard label="Toplam Tweet" value={stats.totalTweets} hint="Son sorgu seti" />
+        <StatCard label="Sorgu Çeşidi" value={stats.uniqueQueries} />
+        <StatCard label="Son Tweet" value={stats.lastFetched || "-"} />
+        <StatCard label="Son Haber" value={stats.lastNews || "-"} />
+      </div>
+
       <div className="grid">
         <Section title="Günlük Tweet Adedi (14g)">
-          {dailyQuery.isLoading ? <p className="muted">Yükleniyor...</p> : <DailyChart data={dailyQuery.data || []} />}
+          {dailyQuery.isLoading ? (
+            <p className="muted">Yükleniyor...</p>
+          ) : (
+            <DailyChart data={dailyQuery.data || []} />
+          )}
         </Section>
 
         <Section title="Sorgu Dağılımı">
-          {topQueries.isLoading ? <p className="muted">Yükleniyor...</p> : <QueryPie data={topQueries.data || []} />}
+          {topQueries.isLoading ? (
+            <p className="muted">Yükleniyor...</p>
+          ) : (
+            <QueryPie data={topQueries.data || []} />
+          )}
+        </Section>
+      </div>
+
+      <div className="grid">
+        <Section title="Son 50 Tweet Zaman Çizelgesi">
+          {timeline.length === 0 ? (
+            <p className="muted">Veri yok</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart
+                data={timeline.map((t, i) => ({ name: i + 1, query: t.query, value: 1 }))}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis allowDecimals={false} />
+                <Tooltip />
+                <Area type="monotone" dataKey="value" stroke="#2563eb" fill="#2563eb33" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </Section>
       </div>
 

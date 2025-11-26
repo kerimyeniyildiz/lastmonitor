@@ -43,7 +43,8 @@ a {
 
 .filters {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  align-items: center;
 }
 
 .input {
@@ -54,9 +55,30 @@ a {
   border-radius: 8px;
 }
 
+.btn {
+  background: var(--accent);
+  color: #e2e8f0;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  font-weight: 600;
+}
+
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.btn:hover {
+  opacity: 0.85;
+}
+
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 16px;
   margin: 16px 0;
 }
@@ -125,6 +147,28 @@ a {
 
 .truncate {
   word-break: break-word;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.stat-card {
+  background: #111827;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.stat-card h3 {
+  margin: 6px 0;
+}
+
+.small {
+  font-size: 12px;
 }
 
 .footer {
