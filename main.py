@@ -377,6 +377,7 @@ def normalize_tweet(raw: Dict) -> Optional[Dict]:
     dt = parse_datetime(created_at_raw)
     return {
         "id": tweet_id or link,
+        "user_handle": (user_handle or "").strip(),
         "user_name": user_name,
         "text": text.strip(),
         "created_at": format_datetime(dt),
@@ -403,6 +404,33 @@ def extract_tweets(payload: Dict) -> List[Dict]:
             tweets.append(normalized)
     tweets.sort(key=lambda item: item.get("sort_ts", 0), reverse=True)
     return tweets
+
+
+def matches_query(search_query: str, tweet: Dict) -> bool:
+    q = (search_query or "").strip()
+    if not q:
+        return True
+    q_lower = q.lower()
+    text_lower = (tweet.get("text") or "").lower()
+    link_lower = (tweet.get("link") or "").lower()
+    handle_lower = (tweet.get("user_handle") or "").lower()
+
+    if q_lower.startswith("from:"):
+        handle = q_lower[5:].strip()
+        return bool(handle) and handle_lower == handle
+    if q_lower.startswith("to:"):
+        handle = q_lower[3:].strip()
+        return bool(handle) and (handle in text_lower or handle in link_lower)
+    if q_lower.startswith("@"):
+        handle = q_lower[1:].strip()
+        return bool(handle) and (
+            handle in text_lower or handle == handle_lower or handle in link_lower
+        )
+
+    terms = [term for term in q_lower.split() if term]
+    if not terms:
+        return True
+    return all(term in text_lower for term in terms)
 
 
 def send_telegram_message(
@@ -436,10 +464,13 @@ def fetch_latest_tweets(
         log(f"tweets json parse failed: {exc}")
         return []
     tweets = extract_tweets(payload)
-    if config.tweet_limit and len(tweets) > config.tweet_limit:
-        tweets = tweets[: config.tweet_limit]
-    log(f"tweets fetched={len(tweets)} query='{search_query}'")
-    return tweets
+    filtered = [tweet for tweet in tweets if matches_query(search_query, tweet)]
+    if config.tweet_limit and len(filtered) > config.tweet_limit:
+        filtered = filtered[: config.tweet_limit]
+    log(
+        f"tweets fetched={len(filtered)} query='{search_query}' raw={len(tweets)}"
+    )
+    return filtered
 
 
 def build_tweet_message(tweet: Dict) -> str:
