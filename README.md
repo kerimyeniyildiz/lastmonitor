@@ -42,6 +42,16 @@ Birden fazla sorguyu farklı aralıklarla takip etmek için:
 QUERY_SCHEDULE=Kırklareli|5m,Lüleburgaz|10m,Babaeski|15m
 ```
 
+Haber kaynakları varsayılan olarak iki sitemap kullanır:
+
+```env
+SITEMAP_URLS=https://www.onadimgazetesi.com/sitemap.xml
+SITEMAP_MONTHLY_TEMPLATES=https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml
+SITEMAP_MONTH_LOOKBACK=1
+```
+
+`SITEMAP_MONTHLY_TEMPLATES` içindeki `{YYYY}` ve `{MM}` alanları otomatik doldurulur. `SITEMAP_MONTH_LOOKBACK=1` ay başlarında önceki ayın sitemap'ini de kontrol eder. Eski uzaktan liste dosyası akışı gerekiyorsa `SITEMAP_LIST_URL` tanımlanabilir; doğrudan sitemap ayarları varsa öncelik onlardadır.
+
 ## API çalıştırma
 
 API'nin veri dönebilmesi için `DB_URL` tanımlı olmalıdır.

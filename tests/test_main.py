@@ -1,10 +1,13 @@
+import os
 import unittest
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import requests
 from main import (
+    Config,
     ISTANBUL_TZ,
+    build_configured_sitemap_urls,
     filter_news_entries,
     normalize_tweet,
     parse_datetime,
@@ -68,6 +71,47 @@ class TweetParsingTests(unittest.TestCase):
 
 
 class SitemapParsingTests(unittest.TestCase):
+    def test_build_configured_sitemap_urls_adds_current_and_previous_month(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        urls = build_configured_sitemap_urls(
+            config, datetime(2026, 6, 27, 12, 0, tzinfo=ISTANBUL_TZ)
+        )
+
+        self.assertEqual(
+            urls,
+            [
+                "https://www.onadimgazetesi.com/sitemap.xml",
+                "https://www.alternatifgazetesi.com/sitemap/sitemap-2026-06.xml",
+                "https://www.alternatifgazetesi.com/sitemap/sitemap-2026-05.xml",
+            ],
+        )
+
+    def test_build_configured_sitemap_urls_supports_custom_templates(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "SITEMAP_URLS": "https://example.com/sitemap.xml",
+                "SITEMAP_MONTHLY_TEMPLATES": "https://example.com/{YYYY}/{M}.xml",
+                "SITEMAP_MONTH_LOOKBACK": "0",
+            },
+            clear=True,
+        ):
+            config = Config.from_env()
+
+        urls = build_configured_sitemap_urls(
+            config, datetime(2026, 6, 27, 12, 0, tzinfo=ISTANBUL_TZ)
+        )
+
+        self.assertEqual(
+            urls,
+            [
+                "https://example.com/sitemap.xml",
+                "https://example.com/2026/6.xml",
+            ],
+        )
+
     def test_parse_sitemap_xml_extracts_url_entries(self) -> None:
         _, entries = parse_sitemap_xml(
             """<?xml version="1.0"?>

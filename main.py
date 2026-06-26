@@ -32,6 +32,10 @@ IMAGE_EXTENSIONS = (
 )
 
 ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
+DEFAULT_SITEMAP_URLS = ("https://www.onadimgazetesi.com/sitemap.xml",)
+DEFAULT_SITEMAP_MONTHLY_TEMPLATES = (
+    "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
+)
 
 
 def log(message: str) -> None:
@@ -67,6 +71,13 @@ def str_to_int(value: Optional[str], default: int) -> int:
         return int(str(value).strip())
     except (TypeError, ValueError):
         return default
+
+
+def parse_list(value: Optional[str]) -> List[str]:
+    if not value:
+        return []
+    normalized = value.replace("\n", ",")
+    return [item.strip() for item in normalized.split(",") if item.strip()]
 
 
 @dataclass
@@ -147,6 +158,9 @@ class Config:
     news_sent_file: str
     news_limit: int
     news_max_age_hours: int
+    sitemap_urls: List[str]
+    sitemap_monthly_templates: List[str]
+    sitemap_month_lookback: int
     sitemap_list_url: str
     sitemap_list_file: str
     sitemap_check_seconds: int
@@ -182,9 +196,19 @@ class Config:
             news_sent_file=os.environ.get("NEWS_SENT_FILE", "sent_news.txt"),
             news_limit=str_to_int(os.environ.get("NEWS_LIMIT"), 10),
             news_max_age_hours=str_to_int(os.environ.get("NEWS_MAX_AGE_HOURS"), 72),
-            sitemap_list_url=os.environ.get(
-                "SITEMAP_LIST_URL", "https://cdn.resimx.com.tr/sitemap.txt"
+            sitemap_urls=parse_list(
+                os.environ.get("SITEMAP_URLS", ",".join(DEFAULT_SITEMAP_URLS))
             ),
+            sitemap_monthly_templates=parse_list(
+                os.environ.get(
+                    "SITEMAP_MONTHLY_TEMPLATES",
+                    ",".join(DEFAULT_SITEMAP_MONTHLY_TEMPLATES),
+                )
+            ),
+            sitemap_month_lookback=max(
+                0, str_to_int(os.environ.get("SITEMAP_MONTH_LOOKBACK"), 1)
+            ),
+            sitemap_list_url=os.environ.get("SITEMAP_LIST_URL", ""),
             sitemap_list_file=os.environ.get("SITEMAP_LIST_FILE", "sitemap.txt"),
             sitemap_check_seconds=str_to_int(
                 os.environ.get("SITEMAP_CHECK_SECONDS"), 600
@@ -609,10 +633,54 @@ def build_tweet_message(tweet: Dict) -> str:
     )
 
 
+def month_offset(dt: datetime, offset: int) -> datetime:
+    month_index = dt.year * 12 + (dt.month - 1) + offset
+    year = month_index // 12
+    month = month_index % 12 + 1
+    return dt.replace(year=year, month=month, day=1)
+
+
+def render_sitemap_template(template: str, dt: datetime) -> str:
+    return template.format(
+        YYYY=f"{dt.year:04d}",
+        YY=f"{dt.year % 100:02d}",
+        MM=f"{dt.month:02d}",
+        M=str(dt.month),
+    )
+
+
+def unique_in_order(values: Iterable[str]) -> List[str]:
+    seen: Set[str] = set()
+    result: List[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def build_configured_sitemap_urls(
+    config: Config, now: Optional[datetime] = None
+) -> List[str]:
+    current = (now or datetime.now(ISTANBUL_TZ)).astimezone(ISTANBUL_TZ)
+    urls: List[str] = list(config.sitemap_urls)
+    for template in config.sitemap_monthly_templates:
+        for offset in range(0, -config.sitemap_month_lookback - 1, -1):
+            urls.append(render_sitemap_template(template, month_offset(current, offset)))
+    return unique_in_order(urls)
+
+
 def load_sitemap_list(
     config: Config, session: requests.Session, force_refresh: bool = False
 ) -> List[str]:
-    should_download = force_refresh or not os.path.exists(config.sitemap_list_file)
+    urls = build_configured_sitemap_urls(config)
+    if urls:
+        return urls
+
+    should_download = bool(config.sitemap_list_url) and (
+        force_refresh or not os.path.exists(config.sitemap_list_file)
+    )
     if should_download:
         try:
             response = session.get(
@@ -626,14 +694,13 @@ def load_sitemap_list(
                 log(f"sitemap list download failed: {response.status_code} (using cache)")
         except requests.RequestException as exc:
             log(f"sitemap list error: {exc}")
-    urls: List[str] = []
     if os.path.exists(config.sitemap_list_file):
         try:
             with open(config.sitemap_list_file, "r", encoding="utf-8") as handle:
                 urls = [line.strip() for line in handle if line.strip()]
         except OSError as exc:
             log(f"sitemap list read failed: {exc}")
-    return urls
+    return unique_in_order(urls)
 
 
 def parse_sitemap_xml(content: str) -> Tuple[List[str], List[Tuple[str, Optional[str]]]]:
