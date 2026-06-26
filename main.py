@@ -556,14 +556,19 @@ def matches_query(search_query: str, tweet: Dict) -> bool:
 
 def send_telegram_message(
     session: requests.Session, token: str, chat_id: str, text: str
-) -> None:
+) -> bool:
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "disable_web_page_preview": False}
-    response = session.post(url, json=payload, timeout=20)
+    try:
+        response = session.post(url, json=payload, timeout=20)
+    except requests.RequestException as exc:
+        log(f"telegram send error: {exc}")
+        return False
     if not response.ok:
         log(f"telegram send failed: {response.status_code} {response.text}")
-    else:
-        log("telegram send ok")
+        return False
+    log("telegram send ok")
+    return True
 
 
 def fetch_latest_tweets(
@@ -748,13 +753,17 @@ def tweet_loop(
                     with lock:
                         if link in sent_links:
                             continue
-                        sent_links.add(link)
-                    send_telegram_message(
+                    sent = send_telegram_message(
                         session,
                         config.telegram_token,
                         config.telegram_chat_id,
                         build_tweet_message(tweet),
                     )
+                    if not sent:
+                        log(f"tweet send skipped link={link}")
+                        continue
+                    with lock:
+                        sent_links.add(link)
                     log(f"tweet sent link={link}")
                     db.insert_tweet(tweet, item.query)
                     new_count += 1
@@ -805,13 +814,17 @@ def news_loop(
             with lock:
                 if link in sent_news:
                     continue
-                sent_news.add(link)
-            send_telegram_message(
+            sent = send_telegram_message(
                 session,
                 config.telegram_token,
                 config.telegram_chat_id,
                 build_news_message(entry),
             )
+            if not sent:
+                log(f"news send skipped link={link}")
+                continue
+            with lock:
+                sent_news.add(link)
             log(f"news sent link={link}")
             db.insert_news(entry)
             sent_now += 1

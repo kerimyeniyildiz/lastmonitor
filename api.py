@@ -8,6 +8,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 
+def str_to_bool(value: Optional[str], default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def isoformat(value: Optional[datetime]) -> Optional[str]:
     if value is None:
         return None
@@ -47,12 +53,16 @@ def get_db() -> DB:
 
 def get_token_header(authorization: Optional[str] = Header(None)) -> None:
     expected = os.environ.get("API_TOKEN", "")
-    if expected:
-        if not authorization or not authorization.startswith("Bearer "):
-            raise HTTPException(status_code=401, detail="Unauthorized")
-        token = authorization.split(" ", 1)[1].strip()
-        if token != expected:
-            raise HTTPException(status_code=401, detail="Unauthorized")
+    require_token = str_to_bool(os.environ.get("API_REQUIRE_TOKEN"), True)
+    if not expected:
+        if require_token:
+            raise HTTPException(status_code=500, detail="API_TOKEN missing")
+        return
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    token = authorization.split(" ", 1)[1].strip()
+    if token != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 app = FastAPI(title="lastmonitor API", version="0.1.0")

@@ -58,7 +58,7 @@ Endpointler:
 - `GET /stats/daily`
 - `GET /stats/top-queries`
 
-API dışarı açılacaksa `API_TOKEN` tanımlayın ve isteklerde `Authorization: Bearer <token>` başlığı gönderin.
+Veri endpointleri varsayılan olarak token ister. `API_TOKEN` tanımlayın ve isteklerde `Authorization: Bearer <token>` başlığı gönderin. Sadece kapalı geliştirme ortamında korumayı kapatmak için `API_REQUIRE_TOKEN=false` kullanın.
 
 ## Runtime dosyaları
 

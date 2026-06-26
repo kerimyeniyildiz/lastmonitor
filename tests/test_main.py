@@ -1,6 +1,8 @@
 import unittest
 from datetime import datetime
+from unittest.mock import Mock
 
+import requests
 from main import (
     ISTANBUL_TZ,
     filter_news_entries,
@@ -9,6 +11,7 @@ from main import (
     parse_duration_seconds,
     parse_query_schedule,
     parse_sitemap_xml,
+    send_telegram_message,
 )
 
 
@@ -91,6 +94,32 @@ class SitemapParsingTests(unittest.TestCase):
         self.assertEqual(len(entries), 1)
         self.assertEqual(entries[0]["link"], "https://example.com/haber")
         self.assertIsNotNone(entries[0]["created_at_dt"])
+
+
+class TelegramTests(unittest.TestCase):
+    def test_send_telegram_message_returns_true_on_success(self) -> None:
+        session = Mock()
+        session.post.return_value = Mock(ok=True)
+
+        result = send_telegram_message(session, "token", "chat", "message")
+
+        self.assertTrue(result)
+
+    def test_send_telegram_message_returns_false_on_http_failure(self) -> None:
+        session = Mock()
+        session.post.return_value = Mock(ok=False, status_code=500, text="error")
+
+        result = send_telegram_message(session, "token", "chat", "message")
+
+        self.assertFalse(result)
+
+    def test_send_telegram_message_returns_false_on_request_error(self) -> None:
+        session = Mock()
+        session.post.side_effect = requests.RequestException("network")
+
+        result = send_telegram_message(session, "token", "chat", "message")
+
+        self.assertFalse(result)
 
 
 if __name__ == "__main__":
