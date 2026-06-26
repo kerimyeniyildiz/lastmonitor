@@ -8,6 +8,7 @@ from main import (
     Config,
     ISTANBUL_TZ,
     build_configured_sitemap_urls,
+    evaluate_tweet_filter,
     filter_news_entries,
     normalize_tweet,
     parse_datetime,
@@ -30,6 +31,11 @@ class ConfigParsingTests(unittest.TestCase):
 
         self.assertEqual([item.query for item in schedule], ["Kırklareli", "Lüleburgaz"])
         self.assertEqual([item.interval_seconds for item in schedule], [300, 600])
+
+    def test_parse_query_schedule_replaces_old_minister_account(self) -> None:
+        schedule = parse_query_schedule("from:Aliyerlikaya|10m", "", 60)
+
+        self.assertEqual(schedule[0].query, "from:mustafaciftcitr")
 
 
 class DateParsingTests(unittest.TestCase):
@@ -68,6 +74,78 @@ class TweetParsingTests(unittest.TestCase):
         self.assertEqual(tweet["link"], "https://x.com/kirklareli/status/123")
         self.assertEqual(tweet["created_at"], "2026-06-27 12:30:00")
         self.assertIsNotNone(tweet["created_at_dt"])
+
+    def test_tweet_filter_matches_blocked_terms_in_mentions(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "normal_user",
+                "user_name": "Normal User",
+                "text": "ayrılmalıyız #lüleburgaz @乂esCort乂 https://t.co/x",
+                "link": "https://x.com/normal_user/status/1",
+            },
+        )
+
+        self.assertEqual(reasons, ["blocked_term:escort"])
+
+    def test_tweet_filter_matches_blocked_terms_in_obfuscated_text(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"BLOCKED_TWEET_TERMS": "e s c o r t"},
+            clear=True,
+        ):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Kırklareli",
+            {
+                "user_handle": "random",
+                "user_name": "Random",
+                "text": "kirklareli escort ilanı",
+                "link": "https://x.com/random/status/1",
+            },
+        )
+
+        self.assertEqual(reasons, ["blocked_term:e s c o r t"])
+
+    def test_tweet_filter_bypasses_official_source_queries(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "from:mustafaciftcitr",
+            {
+                "user_handle": "mustafaciftcitr",
+                "user_name": "Mustafa Çiftçi",
+                "text": "escort operasyonu hakkında açıklama",
+                "link": "https://x.com/mustafaciftcitr/status/1",
+            },
+        )
+
+        self.assertEqual(reasons, [])
+
+    def test_tweet_filter_can_be_turned_off(self) -> None:
+        with patch.dict(os.environ, {"TWEET_FILTER_MODE": "off"}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "random",
+                "user_name": "Random",
+                "text": "lüleburgaz escort",
+                "link": "https://x.com/random/status/1",
+            },
+        )
+
+        self.assertEqual(reasons, [])
 
 
 class SitemapParsingTests(unittest.TestCase):

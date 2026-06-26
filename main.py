@@ -36,6 +36,12 @@ DEFAULT_SITEMAP_URLS = ("https://www.onadimgazetesi.com/sitemap.xml",)
 DEFAULT_SITEMAP_MONTHLY_TEMPLATES = (
     "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
 )
+DEFAULT_BLOCKED_TWEET_TERMS = ("escort",)
+DEFAULT_TWEET_FILTER_BYPASS_QUERIES = (
+    "from:mustafaciftcitr",
+    "Valikirklareli",
+    "KirklareliEmn",
+)
 
 
 def log(message: str) -> None:
@@ -134,6 +140,8 @@ def parse_query_schedule(
             query_clean = query_text.strip()
             if not query_clean:
                 continue
+            if query_clean.lower() == "from:aliyerlikaya":
+                query_clean = "from:mustafaciftcitr"
             interval_seconds = parse_duration_seconds(interval_text, fallback_interval)
             schedule.append(
                 QuerySchedule(query=query_clean, interval_seconds=interval_seconds)
@@ -176,6 +184,9 @@ class Config:
     s3_bucket: str
     s3_sent_urls_key: str
     s3_sent_news_key: str
+    tweet_filter_mode: str
+    blocked_tweet_terms: List[str]
+    tweet_filter_bypass_queries: List[str]
     queries_schedule: List[QuerySchedule]
     db_url: str
 
@@ -229,6 +240,20 @@ class Config:
             s3_bucket=os.environ.get("S3_BUCKET", ""),
             s3_sent_urls_key=os.environ.get("S3_SENT_URLS_KEY", "sent_urls.txt"),
             s3_sent_news_key=os.environ.get("S3_SENT_NEWS_KEY", "sent_news.txt"),
+            tweet_filter_mode=os.environ.get("TWEET_FILTER_MODE", "log")
+            .strip()
+            .lower(),
+            blocked_tweet_terms=parse_list(
+                os.environ.get(
+                    "BLOCKED_TWEET_TERMS", ",".join(DEFAULT_BLOCKED_TWEET_TERMS)
+                )
+            ),
+            tweet_filter_bypass_queries=parse_list(
+                os.environ.get(
+                    "TWEET_FILTER_BYPASS_QUERIES",
+                    ",".join(DEFAULT_TWEET_FILTER_BYPASS_QUERIES),
+                )
+            ),
             queries_schedule=parse_query_schedule(
                 schedule_raw, default_query, default_interval
             ),
@@ -578,6 +603,40 @@ def matches_query(search_query: str, tweet: Dict) -> bool:
     return all(term in text_lower for term in terms)
 
 
+def compact_text(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def query_bypasses_tweet_filter(config: Config, search_query: str) -> bool:
+    query = (search_query or "").strip().lower()
+    if query.startswith("from:"):
+        return True
+    return query in {item.strip().lower() for item in config.tweet_filter_bypass_queries}
+
+
+def evaluate_tweet_filter(config: Config, search_query: str, tweet: Dict) -> List[str]:
+    if config.tweet_filter_mode == "off" or query_bypasses_tweet_filter(
+        config, search_query
+    ):
+        return []
+
+    haystack = " ".join(
+        str(tweet.get(key) or "") for key in ("text", "user_handle", "user_name", "link")
+    )
+    haystack_lower = haystack.lower()
+    haystack_compact = compact_text(haystack)
+    reasons: List[str] = []
+
+    for term in config.blocked_tweet_terms:
+        clean_term = term.strip().lower()
+        if not clean_term:
+            continue
+        if clean_term in haystack_lower or compact_text(clean_term) in haystack_compact:
+            reasons.append(f"blocked_term:{clean_term}")
+
+    return reasons
+
+
 def send_telegram_message(
     session: requests.Session, token: str, chat_id: str, text: str
 ) -> bool:
@@ -815,10 +874,23 @@ def tweet_loop(
                     continue
                 tweets = fetch_latest_tweets(config, session, item.query)
                 new_count = 0
+                filtered_count = 0
                 for tweet in tweets:
                     link = tweet["link"]
                     with lock:
                         if link in sent_links:
+                            continue
+                    filter_reasons = evaluate_tweet_filter(config, item.query, tweet)
+                    if filter_reasons:
+                        log(
+                            "tweet filter match "
+                            f"mode={config.tweet_filter_mode} query='{item.query}' "
+                            f"reasons={','.join(filter_reasons)} link={link}"
+                        )
+                        if config.tweet_filter_mode == "drop":
+                            with lock:
+                                sent_links.add(link)
+                            filtered_count += 1
                             continue
                     sent = send_telegram_message(
                         session,
@@ -834,12 +906,13 @@ def tweet_loop(
                     log(f"tweet sent link={link}")
                     db.insert_tweet(tweet, item.query)
                     new_count += 1
-                if new_count:
+                if new_count or filtered_count:
                     store.save_set(
                         config.s3_sent_urls_key, config.sent_urls_file, sent_links
                     )
                 log(
-                    f"tweets cycle query='{item.query}' fetched={len(tweets)} sent={new_count}"
+                    f"tweets cycle query='{item.query}' fetched={len(tweets)} "
+                    f"sent={new_count} filtered={filtered_count}"
                 )
                 next_run[item.query] = time.time() + max(1, item.interval_seconds)
         except Exception as exc:  # pylint: disable=broad-except

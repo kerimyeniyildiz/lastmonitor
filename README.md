@@ -42,6 +42,16 @@ Birden fazla sorguyu farklı aralıklarla takip etmek için:
 QUERY_SCHEDULE=Kırklareli|5m,Lüleburgaz|10m,Babaeski|15m
 ```
 
+Genel tweet sorgularında bariz gürültüleri önce loglamak için:
+
+```env
+TWEET_FILTER_MODE=log
+BLOCKED_TWEET_TERMS=escort
+TWEET_FILTER_BYPASS_QUERIES=from:mustafaciftcitr,Valikirklareli,KirklareliEmn
+```
+
+`log` modunda tweetler Telegram'a gitmeye devam eder, ama eşleşmeler logda `tweet filter match` olarak görünür. Filtrenin doğru çalıştığından emin olunca `TWEET_FILTER_MODE=drop` yapılabilir. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
+
 Haber kaynakları varsayılan olarak iki sitemap kullanır:
 
 ```env
