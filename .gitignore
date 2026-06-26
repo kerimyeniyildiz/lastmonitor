@@ -13,10 +13,17 @@ env/
 .env
 *.env
 
+# Runtime state / generated data
+sent_urls.txt
+sent_news.txt
+sitemap.txt
+*.log
+
 # OS junk
 .DS_Store
 Thumbs.db
 
-# Frontend
-dashboard/node_modules/
-dashboard/dist/
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

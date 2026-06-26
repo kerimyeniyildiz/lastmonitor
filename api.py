@@ -57,7 +57,7 @@ def get_token_header(authorization: Optional[str] = Header(None)) -> None:
 
 app = FastAPI(title="lastmonitor API", version="0.1.0")
 
-# Allow dashboard/frontend to call the API
+# Allow API clients to call the service.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

@@ -305,7 +305,8 @@ class DBClient:
                         tweet.get("user_name"),
                         tweet.get("text"),
                         tweet.get("link"),
-                        parse_datetime(tweet.get("created_at")),
+                        tweet.get("created_at_dt")
+                        or parse_datetime(tweet.get("created_at")),
                     ),
                 )
         except Exception as exc:  # pylint: disable=broad-except
@@ -328,7 +329,8 @@ class DBClient:
                     (
                         entry.get("link"),
                         urlparse(entry.get("link", "")).netloc,
-                        parse_datetime(entry.get("created_at")),
+                        entry.get("created_at_dt")
+                        or parse_datetime(entry.get("created_at")),
                     ),
                 )
         except Exception as exc:  # pylint: disable=broad-except
@@ -422,9 +424,13 @@ class R2Store:
             self._put_remote_text(key, "\n".join(sorted(snapshot)))
 
 
-def parse_datetime(value: Optional[str]) -> Optional[datetime]:
+def parse_datetime(value: Optional[object]) -> Optional[datetime]:
     if value is None:
         return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=ISTANBUL_TZ)
+        return value
     if isinstance(value, (int, float)):
         try:
             return datetime.fromtimestamp(value, tz=timezone.utc)
@@ -440,9 +446,12 @@ def parse_datetime(value: Optional[str]) -> Optional[datetime]:
         "%a %b %d %H:%M:%S %z %Y",  # Twitter format
     ):
         try:
-            return datetime.strptime(
+            parsed = datetime.strptime(
                 text.replace("Z", "+0000").replace("+00:00", "+0000"), fmt
             )
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=ISTANBUL_TZ)
+            return parsed
         except ValueError:
             continue
     try:
@@ -492,6 +501,7 @@ def normalize_tweet(raw: Dict) -> Optional[Dict]:
         "user_name": user_name,
         "text": text.strip(),
         "created_at": format_datetime(dt),
+        "created_at_dt": dt,
         "sort_ts": dt.timestamp() if dt else 0,
         "link": link,
     }
@@ -691,6 +701,7 @@ def filter_news_entries(
             {
                 "link": link,
                 "created_at": format_datetime(dt),
+                "created_at_dt": dt,
                 "sort_ts": dt.timestamp() if dt else 0,
             }
         )
@@ -859,5 +870,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
