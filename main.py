@@ -1,4 +1,5 @@
 import os
+import re
 import threading
 import time
 import json
@@ -37,6 +38,35 @@ DEFAULT_SITEMAP_MONTHLY_TEMPLATES = (
     "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
 )
 DEFAULT_BLOCKED_TWEET_TERMS = ("escort",)
+DEFAULT_WATCH_TWEET_TERMS = (
+    "ücret elden",
+    "ucret elden",
+    "ödeme elden",
+    "odeme elden",
+    "ev otel",
+    "apart rezidans",
+    "otel rezidans",
+)
+DEFAULT_LOCATION_HASHTAG_TERMS = (
+    "kırklareli",
+    "kirklareli",
+    "lüleburgaz",
+    "luleburgaz",
+    "babaeski",
+    "pınarhisar",
+    "pinarhisar",
+    "kofçaz",
+    "kofcaz",
+    "demirköy",
+    "demirkoy",
+    "pehlivanköy",
+    "pehlivankoy",
+    "kapaklı",
+    "kapakli",
+    "tekirdağ",
+    "tekirdag",
+    "edirne",
+)
 DEFAULT_TWEET_FILTER_BYPASS_QUERIES = (
     "from:mustafaciftcitr",
     "Valikirklareli",
@@ -186,6 +216,8 @@ class Config:
     s3_sent_news_key: str
     tweet_filter_mode: str
     blocked_tweet_terms: List[str]
+    watch_tweet_terms: List[str]
+    location_hashtag_terms: List[str]
     tweet_filter_bypass_queries: List[str]
     queries_schedule: List[QuerySchedule]
     db_url: str
@@ -246,6 +278,15 @@ class Config:
             blocked_tweet_terms=parse_list(
                 os.environ.get(
                     "BLOCKED_TWEET_TERMS", ",".join(DEFAULT_BLOCKED_TWEET_TERMS)
+                )
+            ),
+            watch_tweet_terms=parse_list(
+                os.environ.get("WATCH_TWEET_TERMS", ",".join(DEFAULT_WATCH_TWEET_TERMS))
+            ),
+            location_hashtag_terms=parse_list(
+                os.environ.get(
+                    "LOCATION_HASHTAG_TERMS",
+                    ",".join(DEFAULT_LOCATION_HASHTAG_TERMS),
                 )
             ),
             tweet_filter_bypass_queries=parse_list(
@@ -607,6 +648,24 @@ def compact_text(value: str) -> str:
     return "".join(ch for ch in value.lower() if ch.isalnum())
 
 
+def text_contains_term(haystack_lower: str, haystack_compact: str, term: str) -> bool:
+    clean_term = term.strip().lower()
+    if not clean_term:
+        return False
+    return clean_term in haystack_lower or compact_text(clean_term) in haystack_compact
+
+
+def extract_hashtags(text: str) -> List[str]:
+    return [match.lower() for match in re.findall(r"#([^\s#@/]+)", text or "")]
+
+
+def meaningful_text_length(text: str) -> int:
+    without_urls = re.sub(r"https?://\S+", " ", text or "", flags=re.IGNORECASE)
+    without_mentions = re.sub(r"@\S+", " ", without_urls)
+    without_hashtags = re.sub(r"#\S+", " ", without_mentions)
+    return len(compact_text(without_hashtags))
+
+
 def query_bypasses_tweet_filter(config: Config, search_query: str) -> bool:
     query = (search_query or "").strip().lower()
     if query.startswith("from:"):
@@ -631,10 +690,35 @@ def evaluate_tweet_filter(config: Config, search_query: str, tweet: Dict) -> Lis
         clean_term = term.strip().lower()
         if not clean_term:
             continue
-        if clean_term in haystack_lower or compact_text(clean_term) in haystack_compact:
+        if text_contains_term(haystack_lower, haystack_compact, clean_term):
             reasons.append(f"blocked_term:{clean_term}")
 
+    for term in config.watch_tweet_terms:
+        clean_term = term.strip().lower()
+        if not clean_term:
+            continue
+        if text_contains_term(haystack_lower, haystack_compact, clean_term):
+            reasons.append(f"watch_term:{clean_term}")
+
+    text = str(tweet.get("text") or "")
+    hashtags = extract_hashtags(text)
+    location_terms = {term.lower() for term in config.location_hashtag_terms}
+    location_hashtags = [tag for tag in hashtags if tag in location_terms]
+    if (
+        "http" in text.lower()
+        and len(location_hashtags) >= 2
+        and meaningful_text_length(text) <= 4
+    ):
+        reasons.append("watch_pattern:location_hashtags_link_only")
+
+    if re.search(r"(?:\+?90\s*)?0?5\d{2}[\s.-]?\d{3}[\s.-]?\d{2}[\s.-]?\d{2}", text):
+        reasons.append("watch_pattern:phone_number")
+
     return reasons
+
+
+def should_drop_filtered_tweet(reasons: List[str]) -> bool:
+    return any(reason.startswith("blocked_term:") for reason in reasons)
 
 
 def send_telegram_message(
@@ -888,10 +972,11 @@ def tweet_loop(
                             f"reasons={','.join(filter_reasons)} link={link}"
                         )
                         if config.tweet_filter_mode == "drop":
-                            with lock:
-                                sent_links.add(link)
-                            filtered_count += 1
-                            continue
+                            if should_drop_filtered_tweet(filter_reasons):
+                                with lock:
+                                    sent_links.add(link)
+                                filtered_count += 1
+                                continue
                     sent = send_telegram_message(
                         session,
                         config.telegram_token,

@@ -16,6 +16,7 @@ from main import (
     parse_query_schedule,
     parse_sitemap_xml,
     send_telegram_message,
+    should_drop_filtered_tweet,
 )
 
 
@@ -112,6 +113,77 @@ class TweetParsingTests(unittest.TestCase):
         )
 
         self.assertEqual(reasons, ["blocked_term:e s c o r t"])
+
+    def test_tweet_filter_watches_ad_terms_without_marking_them_droppable(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "random",
+                "user_name": "Random",
+                "text": "#lüleburgaz ödeme elden https://t.co/x",
+                "link": "https://x.com/random/status/1",
+            },
+        )
+
+        self.assertIn("watch_term:ödeme elden", reasons)
+        self.assertFalse(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_watches_location_hashtag_link_only_posts(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "CoxerQ37286",
+                "user_name": "Coxer QUXEFET",
+                "text": "👍 #kapaklı #lüleburgaz https://t.co/aMqpzw0pxj",
+                "link": "https://x.com/CoxerQ37286/status/1",
+            },
+        )
+
+        self.assertIn("watch_pattern:location_hashtags_link_only", reasons)
+        self.assertFalse(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_watches_phone_numbers(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "random",
+                "user_name": "Random",
+                "text": "#lüleburgaz 0530 011 29 40 https://t.co/x",
+                "link": "https://x.com/random/status/1",
+            },
+        )
+
+        self.assertIn("watch_pattern:phone_number", reasons)
+        self.assertFalse(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_blocked_terms_are_droppable(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "random",
+                "user_name": "Random",
+                "text": "lüleburgaz escort",
+                "link": "https://x.com/random/status/1",
+            },
+        )
+
+        self.assertTrue(should_drop_filtered_tweet(reasons))
 
     def test_tweet_filter_bypasses_official_source_queries(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
