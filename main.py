@@ -53,7 +53,12 @@ DEFAULT_SITEMAP_URLS = ("https://www.onadimgazetesi.com/sitemap.xml",)
 DEFAULT_SITEMAP_MONTHLY_TEMPLATES = (
     "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
 )
-DEFAULT_BLOCKED_TWEET_TERMS = ("escort",)
+DEFAULT_BLOCKED_TWEET_TERMS = (
+    "escort",
+    "kırklarelibayan",
+    "kırklarelieskort",
+    "kırklareliesc",
+)
 DEFAULT_TWEET_FILTER_MODE = "drop"
 DEFAULT_DROPPABLE_FILTER_REASONS = (
     "watch_pattern:location_hashtags_link_only",

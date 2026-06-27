@@ -46,7 +46,7 @@ Genel tweet sorgularında bariz gürültüleri önce loglamak için:
 
 ```env
 TWEET_FILTER_MODE=drop
-BLOCKED_TWEET_TERMS=escort
+BLOCKED_TWEET_TERMS=escort,kırklarelibayan,kırklarelieskort,kırklareliesc
 WATCH_TWEET_TERMS=ücret elden,ucret elden,ödeme elden,odeme elden,ev otel,apart rezidans,otel rezidans
 LOCATION_HASHTAG_TERMS=kırklareli,kirklareli,lüleburgaz,luleburgaz,babaeski,pınarhisar,pinarhisar,kofçaz,kofcaz,demirköy,demirkoy,pehlivanköy,pehlivankoy,kapaklı,kapakli,tekirdağ,tekirdag,edirne
 TWEET_FILTER_BYPASS_QUERIES=from:mustafaciftcitr,Valikirklareli,KirklareliEmn
