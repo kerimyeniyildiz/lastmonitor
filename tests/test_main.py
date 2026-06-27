@@ -161,6 +161,94 @@ class TweetParsingTests(unittest.TestCase):
         self.assertIn("watch_pattern:location_hashtags_link_only", reasons)
         self.assertTrue(should_drop_filtered_tweet(reasons))
 
+    def test_tweet_filter_drops_one_location_hashtag_plus_empty_hashtag_link(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Kırklareli",
+            {
+                "user_handle": "JanaNunez5k",
+                "user_name": "Jana Nunez",
+                "text": "📙 #kırklareli #kepez https://t.co/BAkEppO8Xk",
+                "link": "https://x.com/JanaNunez5k/status/1",
+            },
+        )
+
+        self.assertIn("watch_pattern:location_hashtags_link_only", reasons)
+        self.assertTrue(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_drops_location_word_soup_links(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "MelissaEll9o",
+                "user_name": "Melissa Ellis",
+                "text": "#tekirdAğ lüleburgaz edirne görundu  saçlarımdan https://t.co/UZj01WG5J1",
+                "link": "https://x.com/MelissaEll9o/status/1",
+            },
+        )
+
+        self.assertIn("watch_pattern:location_word_soup_link", reasons)
+        self.assertTrue(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_drops_suspicious_generated_handle_location_links(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Kırklareli",
+            {
+                "user_handle": "ParkerJeff61162",
+                "user_name": "Jefferson Parker",
+                "text": "ikizkenar #edirNe üçgen şahsiyat kapıkule havsa hayvanca #kırklareli 🪁 sermayecilik https://t.co/CpewGGrLuw",
+                "link": "https://x.com/ParkerJeff61162/status/1",
+            },
+        )
+
+        self.assertIn("watch_pattern:suspicious_location_link", reasons)
+        self.assertTrue(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_keeps_natural_reply_without_link(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Kırklareli",
+            {
+                "user_handle": "rtgunduz",
+                "user_name": "Ramazan Gündüz",
+                "text": "@arsmaxx @cuneytozdemir Trakya şivesinde gerekli gereksiz herkese Ağa derler. Konum Kırklareli",
+                "link": "https://x.com/rtgunduz/status/1",
+            },
+        )
+
+        self.assertEqual(reasons, [])
+
+    def test_tweet_filter_keeps_long_location_announcement_links(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Babaeski",
+            {
+                "user_handle": "tmotobblidas",
+                "user_name": "TMO-TOBB LİDAŞ",
+                "text": "🔴Ülkemizin ilk lisanslı depo şirketi; TMO-TOBB Tarım Ürünleri Lis. Dep. San. ve Tic. A.Ş. #Babaeski, #Çorum, #Hayrabolu, #Keskin şubeleri ile hizmet veriyor https://t.co/x",
+                "link": "https://x.com/tmotobblidas/status/1",
+            },
+        )
+
+        self.assertFalse(should_drop_filtered_tweet(reasons))
+
     def test_tweet_filter_watches_phone_numbers(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = Config.from_env()
