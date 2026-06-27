@@ -13,6 +13,7 @@ from main import (
     normalize_tweet,
     parse_datetime,
     parse_duration_seconds,
+    parse_instagram_targets,
     parse_query_schedule,
     parse_sitemap_xml,
     send_telegram_message,
@@ -37,6 +38,16 @@ class ConfigParsingTests(unittest.TestCase):
         schedule = parse_query_schedule("from:Aliyerlikaya|10m", "", 60)
 
         self.assertEqual(schedule[0].query, "from:mustafaciftcitr")
+
+    def test_parse_instagram_targets_supports_per_account_intervals(self) -> None:
+        targets = parse_instagram_targets(
+            "@rozmedyahaber|30m,kirklareli_gundem:1h", 1800
+        )
+
+        self.assertEqual(
+            [(item.username, item.interval_seconds) for item in targets],
+            [("rozmedyahaber", 1800), ("kirklareli_gundem", 3600)],
+        )
 
 
 class DateParsingTests(unittest.TestCase):

@@ -3,6 +3,8 @@ import re
 import threading
 import time
 import json
+import random
+import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
@@ -17,6 +19,20 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import psycopg2
+
+try:
+    from instagrapi import Client as InstagramClient
+    from instagrapi.exceptions import (
+        ChallengeRequired,
+        ClientError as InstagramClientError,
+        LoginRequired,
+        PleaseWaitFewMinutes,
+        TwoFactorRequired,
+    )
+except ImportError:  # pragma: no cover - optional dependency when Instagram is disabled.
+    InstagramClient = None
+    ChallengeRequired = InstagramClientError = LoginRequired = PleaseWaitFewMinutes = None
+    TwoFactorRequired = None
 
 
 IMAGE_EXTENSIONS = (
@@ -126,6 +142,12 @@ class QuerySchedule:
     interval_seconds: int
 
 
+@dataclass
+class InstagramTarget:
+    username: str
+    interval_seconds: int
+
+
 def parse_duration_seconds(text: Optional[str], default: int) -> int:
     """Parse durations like '30m', '5m', '60', '1h' into seconds."""
     if text is None:
@@ -187,6 +209,38 @@ def parse_query_schedule(
     return schedule
 
 
+def parse_instagram_targets(raw: Optional[str], fallback_interval: int) -> List[InstagramTarget]:
+    """
+    Parse Instagram target definitions like:
+    INSTAGRAM_TARGETS="rozmedyahaber|30m,kirklareli_gundem|45m"
+    """
+    if fallback_interval <= 0:
+        fallback_interval = 1800
+    targets: List[InstagramTarget] = []
+    text = (raw or "").strip()
+    if not text:
+        return targets
+    for part in text.split(","):
+        item = part.strip()
+        if not item:
+            continue
+        username_text, interval_text = item, str(fallback_interval)
+        if "|" in item:
+            username_text, interval_text = item.split("|", 1)
+        elif ":" in item:
+            username_text, interval_text = item.split(":", 1)
+        username = username_text.strip().lstrip("@")
+        if not username:
+            continue
+        targets.append(
+            InstagramTarget(
+                username=username,
+                interval_seconds=parse_duration_seconds(interval_text, fallback_interval),
+            )
+        )
+    return targets
+
+
 @dataclass
 class Config:
     api_key: str
@@ -198,6 +252,7 @@ class Config:
     telegram_chat_id: str
     sent_urls_file: str
     news_sent_file: str
+    instagram_sent_file: str
     news_limit: int
     news_max_age_hours: int
     sitemap_urls: List[str]
@@ -218,6 +273,7 @@ class Config:
     s3_bucket: str
     s3_sent_urls_key: str
     s3_sent_news_key: str
+    s3_sent_instagram_key: str
     tweet_filter_mode: str
     blocked_tweet_terms: List[str]
     watch_tweet_terms: List[str]
@@ -225,6 +281,14 @@ class Config:
     tweet_filter_bypass_queries: List[str]
     queries_schedule: List[QuerySchedule]
     db_url: str
+    instagram_enable: bool
+    instagram_username: str
+    instagram_password: str
+    instagram_session_file: str
+    instagram_targets: List[InstagramTarget]
+    instagram_limit: int
+    instagram_interval_jitter_seconds: int
+    instagram_send_existing: bool
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -241,6 +305,9 @@ class Config:
             telegram_chat_id=os.environ.get("TELEGRAM_CHAT_ID", ""),
             sent_urls_file=os.environ.get("SENT_URLS_FILE", "sent_urls.txt"),
             news_sent_file=os.environ.get("NEWS_SENT_FILE", "sent_news.txt"),
+            instagram_sent_file=os.environ.get(
+                "INSTAGRAM_SENT_FILE", "sent_instagram.txt"
+            ),
             news_limit=str_to_int(os.environ.get("NEWS_LIMIT"), 10),
             news_max_age_hours=str_to_int(os.environ.get("NEWS_MAX_AGE_HOURS"), 72),
             sitemap_urls=parse_list(
@@ -276,6 +343,9 @@ class Config:
             s3_bucket=os.environ.get("S3_BUCKET", ""),
             s3_sent_urls_key=os.environ.get("S3_SENT_URLS_KEY", "sent_urls.txt"),
             s3_sent_news_key=os.environ.get("S3_SENT_NEWS_KEY", "sent_news.txt"),
+            s3_sent_instagram_key=os.environ.get(
+                "S3_SENT_INSTAGRAM_KEY", "sent_instagram.txt"
+            ),
             tweet_filter_mode=os.environ.get(
                 "TWEET_FILTER_MODE", DEFAULT_TWEET_FILTER_MODE
             )
@@ -305,6 +375,23 @@ class Config:
                 schedule_raw, default_query, default_interval
             ),
             db_url=os.environ.get("DB_URL", ""),
+            instagram_enable=str_to_bool(os.environ.get("INSTAGRAM_ENABLE"), False),
+            instagram_username=os.environ.get("INSTAGRAM_USERNAME", ""),
+            instagram_password=os.environ.get("INSTAGRAM_PASSWORD", ""),
+            instagram_session_file=os.environ.get(
+                "INSTAGRAM_SESSION_FILE", "instagram_session.json"
+            ),
+            instagram_targets=parse_instagram_targets(
+                os.environ.get("INSTAGRAM_TARGETS"),
+                parse_duration_seconds(os.environ.get("INSTAGRAM_INTERVAL"), 1800),
+            ),
+            instagram_limit=str_to_int(os.environ.get("INSTAGRAM_LIMIT"), 5),
+            instagram_interval_jitter_seconds=max(
+                0, parse_duration_seconds(os.environ.get("INSTAGRAM_JITTER"), 300)
+            ),
+            instagram_send_existing=str_to_bool(
+                os.environ.get("INSTAGRAM_SEND_EXISTING"), False
+            ),
         )
 
 
@@ -748,6 +835,101 @@ def send_telegram_message(
     return True
 
 
+def send_telegram_media(
+    session: requests.Session,
+    token: str,
+    chat_id: str,
+    media_kind: Optional[str],
+    media_url: Optional[str],
+    caption: str,
+    fallback_cover_url: Optional[str] = None,
+    max_upload_bytes: int = 45 * 1024 * 1024,
+) -> bool:
+    caption = caption[:997] + "..." if len(caption) > 1000 else caption
+    if not media_kind or not media_url:
+        return send_telegram_message(session, token, chat_id, caption)
+
+    method = "sendVideo" if media_kind == "video" else "sendPhoto"
+    field = "video" if media_kind == "video" else "photo"
+    payload = {"chat_id": chat_id, field: media_url, "caption": caption}
+    if media_kind == "video":
+        payload["supports_streaming"] = "true"
+
+    try:
+        response = session.post(
+            f"https://api.telegram.org/bot{token}/{method}",
+            data=payload,
+            timeout=90,
+        )
+        if response.ok:
+            log(f"telegram {method} ok url")
+            return True
+        log(f"telegram {method} url failed: {response.status_code} {response.text}")
+    except requests.RequestException as exc:
+        log(f"telegram {method} url error: {exc}")
+
+    try:
+        media_response = session.get(media_url, timeout=90)
+        media_response.raise_for_status()
+        content = media_response.content
+    except requests.RequestException as exc:
+        log(f"telegram media download failed: {exc}")
+        content = b""
+
+    if content and len(content) <= max_upload_bytes:
+        suffix = ".mp4" if media_kind == "video" else ".jpg"
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix) as handle:
+                handle.write(content)
+                handle.flush()
+                upload_payload = {"chat_id": chat_id, "caption": caption}
+                if media_kind == "video":
+                    upload_payload["supports_streaming"] = "true"
+                with open(handle.name, "rb") as media_file:
+                    response = session.post(
+                        f"https://api.telegram.org/bot{token}/{method}",
+                        data=upload_payload,
+                        files={field: media_file},
+                        timeout=180,
+                    )
+            if response.ok:
+                log(f"telegram {method} ok upload")
+                return True
+            log(
+                f"telegram {method} upload failed: "
+                f"{response.status_code} {response.text}"
+            )
+        except OSError as exc:
+            log(f"telegram media temp file failed: {exc}")
+    elif content:
+        log(f"telegram media too large: {len(content)} bytes")
+
+    if fallback_cover_url and media_kind == "video":
+        fallback_caption = (
+            caption
+            + "\n\nVideo büyük veya Telegram tarafından alınamadı; kapak görseli gönderildi."
+        )
+        payload = {
+            "chat_id": chat_id,
+            "photo": fallback_cover_url,
+            "caption": fallback_caption[:1000],
+        }
+        try:
+            response = session.post(
+                f"https://api.telegram.org/bot{token}/sendPhoto",
+                data=payload,
+                timeout=90,
+            )
+            if response.ok:
+                log("telegram sendPhoto ok cover")
+                return True
+            log(f"telegram cover failed: {response.status_code} {response.text}")
+        except requests.RequestException as exc:
+            log(f"telegram cover error: {exc}")
+
+    return send_telegram_message(session, token, chat_id, caption)
+
+
 def fetch_latest_tweets(
     config: Config, session: requests.Session, search_query: str
 ) -> List[Dict]:
@@ -1071,11 +1253,332 @@ def news_loop(
         stop_event.wait(config.sitemap_check_seconds)
 
 
+def attr_value(obj: object, name: str, default: Optional[object] = None) -> Optional[object]:
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+def url_to_string(value: Optional[object]) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value)
+    return text if text else None
+
+
+def instagram_media_urls(item: object) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    video_url = url_to_string(attr_value(item, "video_url"))
+    thumbnail_url = url_to_string(attr_value(item, "thumbnail_url"))
+    if video_url:
+        return "video", video_url, thumbnail_url
+    if thumbnail_url:
+        return "photo", thumbnail_url, thumbnail_url
+    resources = attr_value(item, "resources") or []
+    for resource in resources:
+        media_kind, media_url, cover_url = instagram_media_urls(resource)
+        if media_url:
+            return media_kind, media_url, cover_url
+    return None, None, thumbnail_url
+
+
+def normalize_instagram_item(item: object, username: str, kind: str) -> Optional[Dict]:
+    pk = str(attr_value(item, "pk") or attr_value(item, "id") or "").strip()
+    code = str(attr_value(item, "code") or "").strip()
+    taken_at = parse_datetime(attr_value(item, "taken_at"))
+    media_type = attr_value(item, "media_type")
+    media_kind, media_url, cover_url = instagram_media_urls(item)
+    caption = str(attr_value(item, "caption_text") or "").strip()
+
+    if kind == "story":
+        item_id = pk
+        story_id = pk.split("_", 1)[0]
+        link = f"https://www.instagram.com/stories/{username}/{story_id}/" if story_id else ""
+    else:
+        item_id = code or pk
+        link = f"https://www.instagram.com/p/{code}/" if code else ""
+    if not item_id:
+        return None
+
+    if kind == "story":
+        label = "Story"
+    elif media_type == 8:
+        label = "Çoklu Gönderi"
+    elif kind == "clip" or media_type == 2 or media_kind == "video":
+        label = "Video/Reels"
+    else:
+        label = "Gönderi"
+
+    return {
+        "id": item_id,
+        "username": username,
+        "kind": kind,
+        "label": label,
+        "caption": caption,
+        "created_at": format_datetime(taken_at),
+        "created_at_dt": taken_at,
+        "sort_ts": taken_at.timestamp() if taken_at else 0,
+        "link": link,
+        "media_kind": media_kind,
+        "media_url": media_url,
+        "cover_url": cover_url,
+    }
+
+
+def unique_instagram_items(items: Iterable[Dict]) -> List[Dict]:
+    seen: Set[str] = set()
+    unique: List[Dict] = []
+    for item in sorted(items, key=lambda value: value.get("sort_ts", 0), reverse=True):
+        key = item.get("id") or item.get("link")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
+
+
+def build_instagram_message(item: Dict, index: Optional[int] = None) -> str:
+    suffix = f" ({index})" if index else ""
+    if item["kind"] == "story":
+        return (
+            f"📲 Instagram Story{suffix}\n"
+            f"👤 Hesap: @{item['username']}\n"
+            f"🕒 Paylaşım: {item['created_at']}\n"
+            f"🔗 Story: {item['link'] or '-'}"
+        )
+    caption = item.get("caption") or ""
+    return (
+        f"🆕 Instagram {item['label']}{suffix}\n"
+        f"👤 Hesap: @{item['username']}\n"
+        f"🕒 Tarih: {item['created_at']}\n"
+        f"🔗 Link: {item['link'] or '-'}\n"
+        f"💬 Açıklama: {caption[:650]}"
+    )
+
+
+def instagram_sent_key(item: Dict) -> str:
+    return f"instagram:{item['username']}:{item['kind']}:{item['id']}"
+
+
+def instagram_prefix(username: str, kind: str) -> str:
+    return f"instagram:{username}:{kind}:"
+
+
+def has_instagram_sent_prefix(sent_items: Set[str], username: str, kind: str) -> bool:
+    prefix = instagram_prefix(username, kind)
+    return any(item.startswith(prefix) for item in sent_items)
+
+
+def build_instagram_client(config: Config):
+    if InstagramClient is None:
+        raise RuntimeError("instagrapi is not installed")
+    client = InstagramClient()
+    client.delay_range = [1, 3]
+    if os.path.exists(config.instagram_session_file):
+        try:
+            client.load_settings(config.instagram_session_file)
+        except Exception as exc:  # pylint: disable=broad-except
+            log(f"instagram session load failed: {exc}")
+    client.login(config.instagram_username, config.instagram_password)
+    try:
+        client.dump_settings(config.instagram_session_file)
+    except Exception as exc:  # pylint: disable=broad-except
+        log(f"instagram session save failed: {exc}")
+    return client
+
+
+def fetch_instagram_items(config: Config, client, username: str) -> Tuple[List[Dict], List[Dict]]:
+    user_id = client.user_id_from_username(username)
+    story_items = [
+        normalized
+        for normalized in (
+            normalize_instagram_item(item, username, "story")
+            for item in client.user_stories(user_id)
+        )
+        if normalized
+    ]
+    media_items = [
+        normalized
+        for normalized in (
+            normalize_instagram_item(item, username, "media")
+            for item in client.user_medias(user_id, amount=max(config.instagram_limit * 2, 10))
+        )
+        if normalized
+    ]
+    clip_items = [
+        normalized
+        for normalized in (
+            normalize_instagram_item(item, username, "clip")
+            for item in client.user_clips(user_id, amount=max(config.instagram_limit, 5))
+        )
+        if normalized
+    ]
+    feed_items = unique_instagram_items(media_items + clip_items)
+    for item in feed_items:
+        item["kind"] = "feed"
+    story_items = sorted(story_items, key=lambda item: item.get("sort_ts", 0), reverse=True)
+    return story_items[: config.instagram_limit], feed_items[: config.instagram_limit]
+
+
+def next_instagram_interval(config: Config, target: InstagramTarget) -> int:
+    jitter = config.instagram_interval_jitter_seconds
+    base = max(1, target.interval_seconds)
+    if not jitter:
+        return base
+    return max(60, base + random.randint(-jitter, jitter))
+
+
+def process_instagram_group(
+    config: Config,
+    session: requests.Session,
+    store: R2Store,
+    sent_items: Set[str],
+    lock: threading.Lock,
+    username: str,
+    kind: str,
+    items: List[Dict],
+) -> Tuple[int, int]:
+    sent_count = 0
+    seeded_count = 0
+    with lock:
+        first_run_for_group = not has_instagram_sent_prefix(sent_items, username, kind)
+        if first_run_for_group and not config.instagram_send_existing:
+            for item in items:
+                sent_items.add(instagram_sent_key(item))
+            seeded_count = len(items)
+            if seeded_count:
+                store.save_set(
+                    config.s3_sent_instagram_key,
+                    config.instagram_sent_file,
+                    sent_items,
+                )
+            return sent_count, seeded_count
+
+    for item in sorted(items, key=lambda value: value.get("sort_ts", 0)):
+        key = instagram_sent_key(item)
+        with lock:
+            if key in sent_items:
+                continue
+        sent = send_telegram_media(
+            session,
+            config.telegram_token,
+            config.telegram_chat_id,
+            item.get("media_kind"),
+            item.get("media_url"),
+            build_instagram_message(item),
+            item.get("cover_url"),
+        )
+        if not sent:
+            log(f"instagram send skipped link={item.get('link')}")
+            continue
+        with lock:
+            sent_items.add(key)
+        sent_count += 1
+        log(f"instagram sent username={username} kind={kind} link={item.get('link')}")
+
+    if sent_count:
+        store.save_set(
+            config.s3_sent_instagram_key, config.instagram_sent_file, sent_items
+        )
+    return sent_count, seeded_count
+
+
+def instagram_loop(
+    config: Config,
+    session: requests.Session,
+    store: R2Store,
+    sent_items: Set[str],
+    lock: threading.Lock,
+    stop_event: threading.Event,
+) -> None:
+    if not config.instagram_enable:
+        log("instagram disabled")
+        return
+    if not config.instagram_targets:
+        log("instagram disabled: no targets")
+        return
+
+    client = None
+    next_run: Dict[str, float] = {item.username: 0.0 for item in config.instagram_targets}
+    while not stop_event.is_set():
+        try:
+            if client is None:
+                client = build_instagram_client(config)
+                log("instagram login ok")
+
+            now = time.time()
+            for target in config.instagram_targets:
+                due_at = next_run.get(target.username, 0.0)
+                if now < due_at:
+                    continue
+
+                stories, feed_items = fetch_instagram_items(
+                    config, client, target.username
+                )
+                story_sent, story_seeded = process_instagram_group(
+                    config,
+                    session,
+                    store,
+                    sent_items,
+                    lock,
+                    target.username,
+                    "story",
+                    stories,
+                )
+                feed_sent, feed_seeded = process_instagram_group(
+                    config,
+                    session,
+                    store,
+                    sent_items,
+                    lock,
+                    target.username,
+                    "feed",
+                    feed_items,
+                )
+                log(
+                    "instagram cycle "
+                    f"username={target.username} stories={len(stories)} "
+                    f"feed={len(feed_items)} sent={story_sent + feed_sent} "
+                    f"seeded={story_seeded + feed_seeded}"
+                )
+                next_run[target.username] = (
+                    time.time() + next_instagram_interval(config, target)
+                )
+        except (ChallengeRequired, TwoFactorRequired, PleaseWaitFewMinutes, LoginRequired) as exc:
+            log(f"instagram requires attention: {type(exc).__name__} {exc}")
+            send_telegram_message(
+                session,
+                config.telegram_token,
+                config.telegram_chat_id,
+                f"Instagram oturumu müdahale istiyor: {type(exc).__name__}",
+            )
+            return
+        except (InstagramClientError, requests.RequestException) as exc:
+            log(f"instagram recoverable error: {type(exc).__name__} {exc}")
+            client = None
+            stop_event.wait(300)
+        except Exception as exc:  # pylint: disable=broad-except
+            log(f"instagram unexpected error: {type(exc).__name__} {exc}")
+            client = None
+            stop_event.wait(300)
+
+        if next_run:
+            sleep_for = max(1.0, min(next_run.values()) - time.time())
+        else:
+            sleep_for = 300
+        stop_event.wait(sleep_for)
+
+
 def validate_config(config: Config) -> None:
     missing = []
     for key in ("api_key", "telegram_token", "telegram_chat_id"):
         if not getattr(config, key):
             missing.append(key)
+    if config.instagram_enable:
+        for key in ("instagram_username", "instagram_password"):
+            if not getattr(config, key):
+                missing.append(key)
+        if InstagramClient is None:
+            missing.append("instagrapi dependency")
     if missing:
         raise SystemExit(f"Missing required config values: {', '.join(missing)}")
 
@@ -1089,8 +1592,12 @@ def main() -> None:
     db = DBClient(config.db_url)
     sent_tweets = store.load_set(config.s3_sent_urls_key, config.sent_urls_file)
     sent_news = store.load_set(config.s3_sent_news_key, config.news_sent_file)
+    sent_instagram = store.load_set(
+        config.s3_sent_instagram_key, config.instagram_sent_file
+    )
     tweet_lock = threading.Lock()
     news_lock = threading.Lock()
+    instagram_lock = threading.Lock()
     stop_event = threading.Event()
     log("service start")
     tweet_thread = threading.Thread(
@@ -1103,16 +1610,33 @@ def main() -> None:
         args=(config, session, store, db, sent_news, news_lock, stop_event),
         daemon=True,
     )
+    threads = [tweet_thread, news_thread]
+    if config.instagram_enable:
+        instagram_thread = threading.Thread(
+            target=instagram_loop,
+            args=(
+                config,
+                session,
+                store,
+                sent_instagram,
+                instagram_lock,
+                stop_event,
+            ),
+            daemon=True,
+        )
+        threads.append(instagram_thread)
     tweet_thread.start()
     news_thread.start()
+    for thread in threads[2:]:
+        thread.start()
     try:
         while tweet_thread.is_alive() and news_thread.is_alive():
             time.sleep(1)
     except KeyboardInterrupt:
         log("shutdown requested")
         stop_event.set()
-        tweet_thread.join()
-        news_thread.join()
+        for thread in threads:
+            thread.join()
     log("service stop")
 
 

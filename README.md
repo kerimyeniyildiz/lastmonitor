@@ -64,6 +64,23 @@ SITEMAP_MONTH_LOOKBACK=1
 
 `SITEMAP_MONTHLY_TEMPLATES` içindeki `{YYYY}` ve `{MM}` alanları otomatik doldurulur. `SITEMAP_MONTH_LOOKBACK=1` ay başlarında önceki ayın sitemap'ini de kontrol eder. Eski uzaktan liste dosyası akışı gerekiyorsa `SITEMAP_LIST_URL` tanımlanabilir; doğrudan sitemap ayarları varsa öncelik onlardadır.
 
+Instagram takibi isteğe bağlıdır ve `instagrapi` ile ayrı bir Instagram oturumu kullanır. İlk çalıştırmada mevcut içerikler varsayılan olarak sadece işaretlenir, Telegram'a gönderilmez; bundan sonraki yeni story/gönderi/reels içerikleri bildirilir.
+
+```env
+INSTAGRAM_ENABLE=true
+INSTAGRAM_USERNAME=
+INSTAGRAM_PASSWORD=
+INSTAGRAM_TARGETS=rozmedyahaber|30m,kirklareli_gundem|30m
+INSTAGRAM_INTERVAL=30m
+INSTAGRAM_JITTER=5m
+INSTAGRAM_LIMIT=5
+INSTAGRAM_SESSION_FILE=instagram_session.json
+INSTAGRAM_SENT_FILE=sent_instagram.txt
+INSTAGRAM_SEND_EXISTING=false
+```
+
+Instagram döngüsü her hedef için story, gönderi ve reels verisini tarihe göre sıralar. Telegram medya URL'yi doğrudan alamazsa dosyayı indirip yüklemeyi dener; video çok büyükse kapak görseli ve link gönderir. Instagram challenge, iki aşamalı doğrulama veya bekleme hatası isterse döngü kendini durdurur ve Telegram'a müdahale gerektiğini bildirir.
+
 ## API çalıştırma
 
 API'nin veri dönebilmesi için `DB_URL` tanımlı olmalıdır.
@@ -88,6 +105,8 @@ Worker aynı linkleri tekrar göndermemek için yerelde şu dosyaları oluştura
 
 - `sent_urls.txt`
 - `sent_news.txt`
+- `sent_instagram.txt`
+- `instagram_session.json`
 - `sitemap.txt`
 
 Bu dosyalar çalışma zamanı verisidir ve git'e eklenmez.
