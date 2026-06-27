@@ -38,6 +38,10 @@ DEFAULT_SITEMAP_MONTHLY_TEMPLATES = (
     "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
 )
 DEFAULT_BLOCKED_TWEET_TERMS = ("escort",)
+DEFAULT_TWEET_FILTER_MODE = "drop"
+DEFAULT_DROPPABLE_FILTER_REASONS = (
+    "watch_pattern:location_hashtags_link_only",
+)
 DEFAULT_WATCH_TWEET_TERMS = (
     "ücret elden",
     "ucret elden",
@@ -272,7 +276,9 @@ class Config:
             s3_bucket=os.environ.get("S3_BUCKET", ""),
             s3_sent_urls_key=os.environ.get("S3_SENT_URLS_KEY", "sent_urls.txt"),
             s3_sent_news_key=os.environ.get("S3_SENT_NEWS_KEY", "sent_news.txt"),
-            tweet_filter_mode=os.environ.get("TWEET_FILTER_MODE", "log")
+            tweet_filter_mode=os.environ.get(
+                "TWEET_FILTER_MODE", DEFAULT_TWEET_FILTER_MODE
+            )
             .strip()
             .lower(),
             blocked_tweet_terms=parse_list(
@@ -718,7 +724,11 @@ def evaluate_tweet_filter(config: Config, search_query: str, tweet: Dict) -> Lis
 
 
 def should_drop_filtered_tweet(reasons: List[str]) -> bool:
-    return any(reason.startswith("blocked_term:") for reason in reasons)
+    droppable_reasons = set(DEFAULT_DROPPABLE_FILTER_REASONS)
+    return any(
+        reason.startswith("blocked_term:") or reason in droppable_reasons
+        for reason in reasons
+    )
 
 
 def send_telegram_message(

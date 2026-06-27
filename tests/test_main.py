@@ -132,7 +132,7 @@ class TweetParsingTests(unittest.TestCase):
         self.assertIn("watch_term:ödeme elden", reasons)
         self.assertFalse(should_drop_filtered_tweet(reasons))
 
-    def test_tweet_filter_watches_location_hashtag_link_only_posts(self) -> None:
+    def test_tweet_filter_drops_location_hashtag_link_only_posts(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = Config.from_env()
 
@@ -148,7 +148,7 @@ class TweetParsingTests(unittest.TestCase):
         )
 
         self.assertIn("watch_pattern:location_hashtags_link_only", reasons)
-        self.assertFalse(should_drop_filtered_tweet(reasons))
+        self.assertTrue(should_drop_filtered_tweet(reasons))
 
     def test_tweet_filter_watches_phone_numbers(self) -> None:
         with patch.dict(os.environ, {}, clear=True):

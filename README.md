@@ -45,14 +45,14 @@ QUERY_SCHEDULE=Kırklareli|5m,Lüleburgaz|10m,Babaeski|15m
 Genel tweet sorgularında bariz gürültüleri önce loglamak için:
 
 ```env
-TWEET_FILTER_MODE=log
+TWEET_FILTER_MODE=drop
 BLOCKED_TWEET_TERMS=escort
 WATCH_TWEET_TERMS=ücret elden,ucret elden,ödeme elden,odeme elden,ev otel,apart rezidans,otel rezidans
 LOCATION_HASHTAG_TERMS=kırklareli,kirklareli,lüleburgaz,luleburgaz,babaeski,pınarhisar,pinarhisar,kofçaz,kofcaz,demirköy,demirkoy,pehlivanköy,pehlivankoy,kapaklı,kapakli,tekirdağ,tekirdag,edirne
 TWEET_FILTER_BYPASS_QUERIES=from:mustafaciftcitr,Valikirklareli,KirklareliEmn
 ```
 
-`log` modunda tweetler Telegram'a gitmeye devam eder, ama eşleşmeler logda `tweet filter match` olarak görünür. `BLOCKED_TWEET_TERMS` güvenli engel adaylarıdır; `drop` modunda sadece bu sebepler Telegram'a gönderilmeyebilir. `WATCH_TWEET_TERMS`, telefon numarası ve sadece lokasyon hashtag'i + link gibi desenler ise gözlem içindir; yanlış pozitif riskini ölçmeden bunlara göre susturma yapılmaz. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
+`drop` modunda güvenli görülen spamler Telegram'a gönderilmez. Şu an `BLOCKED_TWEET_TERMS` eşleşmeleri ve sadece lokasyon hashtag'i + link içeren paylaşımlar düşürülür. `WATCH_TWEET_TERMS` ve telefon numarası gibi diğer sinyaller logda kalır; yanlış pozitif riskini ölçmeden bunlara göre susturma yapılmaz. Geçici gözlem için `TWEET_FILTER_MODE=log`, tamamen kapatmak için `TWEET_FILTER_MODE=off` kullanılabilir. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
 
 Haber kaynakları varsayılan olarak iki sitemap kullanır:
 
