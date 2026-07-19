@@ -1,11 +1,12 @@
 import os
 import unittest
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import requests
 from main import (
     Config,
+    DBClient,
     ISTANBUL_TZ,
     build_configured_sitemap_urls,
     evaluate_tweet_filter,
@@ -335,6 +336,69 @@ class TweetParsingTests(unittest.TestCase):
         )
 
         self.assertEqual(reasons, [])
+
+
+class DBClientTests(unittest.TestCase):
+    def test_reconnects_and_flushes_tweets_queued_during_startup_outage(self) -> None:
+        clock = {"value": 100.0}
+        connection = MagicMock()
+        connection.closed = 0
+        cursor = connection.cursor.return_value.__enter__.return_value
+        first_tweet = {
+            "id": "1",
+            "user_handle": "spam_account",
+            "user_name": "Spam Account",
+            "text": "kırklarelibayan",
+            "link": "https://x.com/spam_account/status/1",
+            "created_at": "2026-07-19T12:00:00+03:00",
+        }
+        second_tweet = {
+            "id": "2",
+            "user_handle": "news_account",
+            "user_name": "News Account",
+            "text": "Kırklareli haberi",
+            "link": "https://x.com/news_account/status/2",
+            "created_at": "2026-07-19T12:01:00+03:00",
+        }
+
+        with patch("main.time.monotonic", side_effect=lambda: clock["value"]):
+            with patch(
+                "main.psycopg2.connect",
+                side_effect=[Exception("temporary dns failure"), connection],
+            ) as connect:
+                db = DBClient("postgresql://db", retry_interval_seconds=30)
+                queued = db.insert_tweet(
+                    first_tweet,
+                    "Kırklareli",
+                    delivery_status="filtered",
+                    filter_reasons=["blocked_term:kırklarelibayan"],
+                )
+                clock["value"] = 131.0
+                inserted = db.insert_tweet(second_tweet, "Kırklareli")
+
+        self.assertFalse(queued)
+        self.assertTrue(inserted)
+        self.assertEqual(connect.call_count, 2)
+        self.assertEqual(db.pending_tweets, {})
+        insert_params = [
+            call.args[1]
+            for call in cursor.execute.call_args_list
+            if "INSERT INTO tweets" in call.args[0]
+        ]
+        self.assertEqual(len(insert_params), 2)
+        self.assertEqual(insert_params[0][7], "filtered")
+        self.assertEqual(
+            insert_params[0][8], ["blocked_term:kırklarelibayan"]
+        )
+        self.assertEqual(insert_params[1][7], "sent")
+
+    def test_missing_db_url_disables_persistence_without_connecting(self) -> None:
+        with patch("main.psycopg2.connect") as connect:
+            db = DBClient("")
+
+        self.assertFalse(db.enabled)
+        self.assertFalse(db.insert_tweet({}, "Kırklareli"))
+        connect.assert_not_called()
 
 
 class SitemapParsingTests(unittest.TestCase):

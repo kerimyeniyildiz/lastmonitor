@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import psycopg2
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
@@ -86,6 +86,9 @@ def health() -> Dict[str, str]:
 def list_tweets(
     q: Optional[str] = Query(None, description="Query label stored with tweet"),
     search: Optional[str] = Query(None, description="ILIKE filter on text"),
+    status: Literal["sent", "filtered", "all"] = Query(
+        "sent", description="Telegram delivery status"
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     db: DB = Depends(get_db),
@@ -99,9 +102,13 @@ def list_tweets(
     if search:
         filters.append("text ILIKE %s")
         params.append(f"%{search}%")
+    if status != "all":
+        filters.append("delivery_status = %s")
+        params.append(status)
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
     sql = f"""
-        SELECT tweet_id, query, user_handle, user_name, text, link, tweet_created_at, fetched_at
+        SELECT tweet_id, query, user_handle, user_name, text, link,
+               tweet_created_at, delivery_status, filter_reasons, fetched_at
         FROM tweets
         {where}
         ORDER BY COALESCE(tweet_created_at, fetched_at) DESC
@@ -138,6 +145,7 @@ def stats_daily(
             date(COALESCE(tweet_created_at, fetched_at)) AS day,
             COUNT(*) AS tweets
         FROM tweets
+        WHERE delivery_status = 'sent'
         GROUP BY day
         ORDER BY day DESC
         LIMIT 90
@@ -155,6 +163,7 @@ def stats_top_queries(
     sql = """
         SELECT query, COUNT(*) AS total
         FROM tweets
+        WHERE delivery_status = 'sent'
         GROUP BY query
         ORDER BY total DESC
         LIMIT %s

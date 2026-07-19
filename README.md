@@ -92,12 +92,14 @@ uvicorn api:app --host 0.0.0.0 --port 8000
 Endpointler:
 
 - `GET /health`
-- `GET /tweets`
+- `GET /tweets` (varsayılan `status=sent`; ayrıca `status=filtered` ve `status=all`)
 - `GET /news`
 - `GET /stats/daily`
 - `GET /stats/top-queries`
 
 Veri endpointleri varsayılan olarak token ister. `API_TOKEN` tanımlayın ve isteklerde `Authorization: Bearer <token>` başlığı gönderin. Sadece kapalı geliştirme ortamında korumayı kapatmak için `API_REQUIRE_TOKEN=false` kullanın.
+
+Worker geçici bir PostgreSQL bağlantı hatasında kayıtları bellekte sıraya alır ve bağlantıyı düzenli olarak yeniden dener. Tweet kayıtlarında `delivery_status` alanı Telegram'a gönderilenler için `sent`, spam filtresinin düşürdükleri için `filtered` değerini taşır; eşleşen sinyaller `filter_reasons` alanında saklanır. Gerekli tablo alanları mevcut veritabanına otomatik eklenir.
 
 ## Runtime dosyaları
 

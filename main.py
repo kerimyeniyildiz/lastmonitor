@@ -420,30 +420,73 @@ def build_http_session(config: Config) -> requests.Session:
 class DBClient:
     """Lightweight Postgres client for persisting tweets/news."""
 
-    def __init__(self, db_url: str):
+    TWEET_INSERT_SQL = """
+        INSERT INTO tweets (
+            tweet_id, query, user_handle, user_name, text, link,
+            tweet_created_at, delivery_status, filter_reasons
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (link) DO NOTHING;
+    """
+    NEWS_INSERT_SQL = """
+        INSERT INTO news (link, source, news_created_at)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (link) DO NOTHING;
+    """
+
+    def __init__(
+        self,
+        db_url: str,
+        retry_interval_seconds: int = 30,
+        pending_limit: int = 50000,
+    ):
         self.db_url = db_url
         self.conn = None
         self.enabled = bool(db_url)
+        self.retry_interval_seconds = max(0, retry_interval_seconds)
+        self.pending_limit = max(1, pending_limit)
+        self.next_retry_at = 0.0
+        self.tables_ready = False
+        self.lock = threading.RLock()
+        self.pending_tweets: Dict[str, Tuple] = {}
+        self.pending_news: Dict[str, Tuple] = {}
         if not self.enabled:
             return
-        self._ensure_connection()
         self.ensure_tables()
 
-    def _ensure_connection(self) -> None:
+    def _disconnect_locked(self) -> None:
+        if self.conn is not None:
+            try:
+                self.conn.close()
+            except Exception:  # pylint: disable=broad-except
+                pass
+        self.conn = None
+        self.tables_ready = False
+        self.next_retry_at = time.monotonic() + self.retry_interval_seconds
+
+    def _ensure_connection_locked(self) -> bool:
         if not self.enabled:
-            return
+            return False
         if self.conn and not self.conn.closed:
-            return
+            return True
+        if time.monotonic() < self.next_retry_at:
+            return False
         try:
             self.conn = psycopg2.connect(self.db_url, connect_timeout=5)
             self.conn.autocommit = True
+            self.next_retry_at = 0.0
+            log("db connected")
+            return True
         except Exception as exc:  # pylint: disable=broad-except
             log(f"db connect failed: {exc}")
-            self.enabled = False
+            self._disconnect_locked()
+            return False
 
-    def ensure_tables(self) -> None:
-        if not self.enabled:
-            return
+    def _ensure_tables_locked(self) -> bool:
+        if not self._ensure_connection_locked():
+            return False
+        if self.tables_ready:
+            return True
         try:
             with self.conn.cursor() as cur:
                 cur.execute(
@@ -457,10 +500,18 @@ class DBClient:
                         text TEXT,
                         link TEXT UNIQUE,
                         tweet_created_at TIMESTAMPTZ,
+                        delivery_status TEXT NOT NULL DEFAULT 'sent',
+                        filter_reasons TEXT[] NOT NULL DEFAULT '{}',
                         fetched_at TIMESTAMPTZ DEFAULT NOW()
                     );
+                    ALTER TABLE tweets
+                        ADD COLUMN IF NOT EXISTS delivery_status TEXT NOT NULL DEFAULT 'sent';
+                    ALTER TABLE tweets
+                        ADD COLUMN IF NOT EXISTS filter_reasons TEXT[] NOT NULL DEFAULT '{}';
                     CREATE INDEX IF NOT EXISTS idx_tweets_query_created_at
                         ON tweets (query, tweet_created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_tweets_delivery_status_created_at
+                        ON tweets (delivery_status, tweet_created_at DESC);
                     CREATE TABLE IF NOT EXISTS news (
                         id SERIAL PRIMARY KEY,
                         link TEXT UNIQUE,
@@ -470,61 +521,110 @@ class DBClient:
                     );
                     """
                 )
+            self.tables_ready = True
+            return True
         except Exception as exc:  # pylint: disable=broad-except
             log(f"db ensure tables failed: {exc}")
-            self.enabled = False
+            self._disconnect_locked()
+            return False
 
-    def insert_tweet(self, tweet: Dict, query: str) -> None:
+    def ensure_tables(self) -> bool:
         if not self.enabled:
+            return False
+        with self.lock:
+            return self._ensure_tables_locked()
+
+    def _queue_locked(self, queue: Dict[str, Tuple], key: str, params: Tuple) -> None:
+        if key in queue:
             return
-        self._ensure_connection()
-        if not self.enabled:
-            return
+        if len(queue) >= self.pending_limit:
+            oldest_key = next(iter(queue))
+            queue.pop(oldest_key)
+            log(f"db pending queue full: dropped oldest key={oldest_key}")
+        queue[key] = params
+
+    def _execute_locked(self, sql: str, params: Tuple, label: str) -> bool:
         try:
             with self.conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO tweets (tweet_id, query, user_handle, user_name, text, link, tweet_created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (link) DO NOTHING;
-                    """,
-                    (
-                        tweet.get("id"),
-                        query,
-                        tweet.get("user_handle"),
-                        tweet.get("user_name"),
-                        tweet.get("text"),
-                        tweet.get("link"),
-                        tweet.get("created_at_dt")
-                        or parse_datetime(tweet.get("created_at")),
-                    ),
-                )
+                cur.execute(sql, params)
+            return True
         except Exception as exc:  # pylint: disable=broad-except
-            log(f"db insert tweet failed: {exc}")
+            log(f"db insert {label} failed: {exc}")
+            self._disconnect_locked()
+            return False
 
-    def insert_news(self, entry: Dict) -> None:
+    def _flush_pending_locked(self) -> bool:
+        flushed_tweets = 0
+        flushed_news = 0
+        for key, params in list(self.pending_tweets.items()):
+            if not self._execute_locked(self.TWEET_INSERT_SQL, params, "tweet"):
+                return False
+            self.pending_tweets.pop(key, None)
+            flushed_tweets += 1
+        for key, params in list(self.pending_news.items()):
+            if not self._execute_locked(self.NEWS_INSERT_SQL, params, "news"):
+                return False
+            self.pending_news.pop(key, None)
+            flushed_news += 1
+        if flushed_tweets or flushed_news:
+            log(
+                f"db pending flushed tweets={flushed_tweets} news={flushed_news}"
+            )
+        return True
+
+    def insert_tweet(
+        self,
+        tweet: Dict,
+        query: str,
+        delivery_status: str = "sent",
+        filter_reasons: Optional[List[str]] = None,
+    ) -> bool:
         if not self.enabled:
-            return
-        self._ensure_connection()
+            return False
+        link = str(tweet.get("link") or tweet.get("id") or "")
+        params = (
+            tweet.get("id"),
+            query,
+            tweet.get("user_handle"),
+            tweet.get("user_name"),
+            tweet.get("text"),
+            tweet.get("link"),
+            tweet.get("created_at_dt") or parse_datetime(tweet.get("created_at")),
+            delivery_status,
+            list(filter_reasons or []),
+        )
+        with self.lock:
+            if not self._ensure_tables_locked():
+                self._queue_locked(self.pending_tweets, link, params)
+                return False
+            if not self._flush_pending_locked():
+                self._queue_locked(self.pending_tweets, link, params)
+                return False
+            if self._execute_locked(self.TWEET_INSERT_SQL, params, "tweet"):
+                return True
+            self._queue_locked(self.pending_tweets, link, params)
+            return False
+
+    def insert_news(self, entry: Dict) -> bool:
         if not self.enabled:
-            return
-        try:
-            with self.conn.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO news (link, source, news_created_at)
-                    VALUES (%s, %s, %s)
-                    ON CONFLICT (link) DO NOTHING;
-                    """,
-                    (
-                        entry.get("link"),
-                        urlparse(entry.get("link", "")).netloc,
-                        entry.get("created_at_dt")
-                        or parse_datetime(entry.get("created_at")),
-                    ),
-                )
-        except Exception as exc:  # pylint: disable=broad-except
-            log(f"db insert news failed: {exc}")
+            return False
+        link = str(entry.get("link") or "")
+        params = (
+            entry.get("link"),
+            urlparse(entry.get("link", "")).netloc,
+            entry.get("created_at_dt") or parse_datetime(entry.get("created_at")),
+        )
+        with self.lock:
+            if not self._ensure_tables_locked():
+                self._queue_locked(self.pending_news, link, params)
+                return False
+            if not self._flush_pending_locked():
+                self._queue_locked(self.pending_news, link, params)
+                return False
+            if self._execute_locked(self.NEWS_INSERT_SQL, params, "news"):
+                return True
+            self._queue_locked(self.pending_news, link, params)
+            return False
 
 
 class R2Store:
@@ -1206,6 +1306,12 @@ def tweet_loop(
                         )
                         if config.tweet_filter_mode == "drop":
                             if should_drop_filtered_tweet(filter_reasons):
+                                db.insert_tweet(
+                                    tweet,
+                                    item.query,
+                                    delivery_status="filtered",
+                                    filter_reasons=filter_reasons,
+                                )
                                 with lock:
                                     sent_links.add(link)
                                 filtered_count += 1
@@ -1222,7 +1328,12 @@ def tweet_loop(
                     with lock:
                         sent_links.add(link)
                     log(f"tweet sent link={link}")
-                    db.insert_tweet(tweet, item.query)
+                    db.insert_tweet(
+                        tweet,
+                        item.query,
+                        delivery_status="sent",
+                        filter_reasons=filter_reasons,
+                    )
                     new_count += 1
                 if new_count or filtered_count:
                     store.save_set(
