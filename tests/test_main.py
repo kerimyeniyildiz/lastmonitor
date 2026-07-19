@@ -19,6 +19,7 @@ from main import (
     parse_sitemap_xml,
     send_telegram_message,
     should_drop_filtered_tweet,
+    tweet_loop,
 )
 
 
@@ -399,6 +400,47 @@ class DBClientTests(unittest.TestCase):
         self.assertFalse(db.enabled)
         self.assertFalse(db.insert_tweet({}, "Kırklareli"))
         connect.assert_not_called()
+
+
+class TweetLoopTests(unittest.TestCase):
+    def test_dropped_tweet_is_persisted_without_telegram_delivery(self) -> None:
+        with patch.dict(
+            os.environ, {"QUERY_SCHEDULE": "Kırklareli|1s"}, clear=True
+        ):
+            config = Config.from_env()
+        tweet = {
+            "id": "1",
+            "user_handle": "spam_account",
+            "user_name": "Spam Account",
+            "text": "kırklarelibayan ilanı",
+            "link": "https://x.com/spam_account/status/1",
+            "created_at": "2026-07-19T12:00:00+03:00",
+        }
+        store = Mock()
+        db = Mock()
+        stop_event = Mock()
+        stop_event.is_set.side_effect = [False, True]
+
+        with patch("main.fetch_latest_tweets", return_value=[tweet]):
+            with patch("main.send_telegram_message") as send:
+                tweet_loop(
+                    config,
+                    Mock(),
+                    store,
+                    db,
+                    set(),
+                    MagicMock(),
+                    stop_event,
+                )
+
+        send.assert_not_called()
+        db.insert_tweet.assert_called_once_with(
+            tweet,
+            "Kırklareli",
+            delivery_status="filtered",
+            filter_reasons=["blocked_term:kırklarelibayan"],
+        )
+        store.save_set.assert_called_once()
 
 
 class SitemapParsingTests(unittest.TestCase):
