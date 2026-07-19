@@ -53,6 +53,26 @@ describe("tweet filtering parity", () => {
     }
   });
 
+  it("drops the observed generated location-link campaign", () => {
+    const samples = [
+      tweet("Daryl1057822", "Daryl", "🙄 et sineği #kırklareli hayrat"),
+      tweet("Sadie131026", "Sadie", "güzel ☹ #kırklareli yeğlik"),
+      tweet("Dolores867030", "Dolores", "ön yönetebilmek ☹ #kırklareli gün"),
+    ];
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(config, "Kırklareli", item);
+      expect(reasons).toContain("watch_pattern:generated_location_link_campaign");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("keeps Alitek as a normal user", () => {
+    const item = tweet("Alitek3959", "Ali Tek", "Lüleburgaz şu an yeri olan");
+    item.text = "Lüleburgaz şu an yeri olan";
+
+    expect(shouldDropTweet(evaluateTweetFilter(config, "Lüleburgaz", item))).toBe(false);
+  });
+
   it("does not apply the Luleburgaz campaign rule to other queries", () => {
     const reasons = evaluateTweetFilter(
       config,

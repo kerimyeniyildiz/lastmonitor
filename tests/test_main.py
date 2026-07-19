@@ -270,6 +270,63 @@ class TweetParsingTests(unittest.TestCase):
                 self.assertIn(reason, reasons)
                 self.assertTrue(should_drop_filtered_tweet(reasons))
 
+    def test_tweet_filter_drops_generated_location_link_campaign(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        samples = [
+            (
+                "Daryl1057822",
+                "Daryl",
+                "🙄 et sineği #kırklareli hayrat https://t.co/a",
+            ),
+            (
+                "Sadie131026",
+                "Sadie",
+                "güzel ☹ #kırklareli yeğlik https://t.co/b",
+            ),
+            (
+                "Dolores867030",
+                "Dolores",
+                "ön yönetebilmek ☹ #kırklareli gün https://t.co/c",
+            ),
+        ]
+
+        for index, (handle, name, text) in enumerate(samples):
+            with self.subTest(handle=handle):
+                reasons = evaluate_tweet_filter(
+                    config,
+                    "Kırklareli",
+                    {
+                        "user_handle": handle,
+                        "user_name": name,
+                        "text": text,
+                        "link": f"https://x.com/{handle}/status/{index}",
+                    },
+                )
+
+                self.assertIn(
+                    "watch_pattern:generated_location_link_campaign", reasons
+                )
+                self.assertTrue(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_keeps_alitek(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "Alitek3959",
+                "user_name": "Ali Tek",
+                "text": "Lüleburgaz şu an yeri olan",
+                "link": "https://x.com/Alitek3959/status/1",
+            },
+        )
+
+        self.assertFalse(should_drop_filtered_tweet(reasons))
+
     def test_tweet_filter_drops_luleburgaz_ad_profile_location_dump(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = Config.from_env()
