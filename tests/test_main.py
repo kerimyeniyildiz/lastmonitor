@@ -235,6 +235,121 @@ class TweetParsingTests(unittest.TestCase):
         self.assertIn("watch_pattern:suspicious_location_link", reasons)
         self.assertTrue(should_drop_filtered_tweet(reasons))
 
+    def test_tweet_filter_drops_luleburgaz_short_link_campaign(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        samples = [
+            ("Richard78459041", "Richard", "#lüleburgaz Verilerin dolup"),
+            ("Olga1071492", "Olga", "ödemeli lüleburgaz ön öncelemek #çorlu"),
+            ("Lorraine1645970", "Lorraine", "#lüleburgaz Her bir"),
+            ("Mary141509", "Mary", "#lüleburgaz gördüm karanlık"),
+            ("Ami1960541", "Ami", "#lüleburgaz etrafımızda seni"),
+            ("Jason4858240311", "Jason", "benim #lüleburgaz yüzden"),
+            ("Jason8883368957", "Jason", "#lüleburgaz için bir"),
+            ("Mildred1066551", "Mildred", "#lüleburgaz yazıldığı sen"),
+            ("Henry094129372", "Henry", "#lüleburgaz inanışmışsın Gözlerin"),
+            ("Joan70019329190", "Joan", "#lüleburgaz uygun ve"),
+            ("Jonas448468", "Jonas", "Gözlerin olacak #lüleburgaz"),
+        ]
+        reason = "watch_pattern:luleburgaz_short_link_campaign"
+
+        for index, (handle, name, text) in enumerate(samples):
+            with self.subTest(handle=handle):
+                reasons = evaluate_tweet_filter(
+                    config,
+                    "Lüleburgaz",
+                    {
+                        "user_handle": handle,
+                        "user_name": name,
+                        "text": f"{text} https://t.co/{index}",
+                        "link": f"https://x.com/{handle}/status/{index}",
+                    },
+                )
+
+                self.assertIn(reason, reasons)
+                self.assertTrue(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_drops_luleburgaz_ad_profile_location_dump(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Lüleburgaz",
+            {
+                "user_handle": "DonaldBaco49691",
+                "user_name": "GÜZEL BAYAN",
+                "text": (
+                    "Huzur en büyük servettir çorlu,çerkezköy,kapaklı,"
+                    "tekirdağ,lüleburgaz,şarkköy,malkara,hayrabolu,saray,"
+                    "ergene,muratlı,marmaraereğlisi,bayan https://t.co/x"
+                ),
+                "link": "https://x.com/DonaldBaco49691/status/1",
+            },
+        )
+
+        self.assertIn("watch_pattern:luleburgaz_ad_profile", reasons)
+        self.assertIn("watch_pattern:luleburgaz_location_dump", reasons)
+        self.assertTrue(should_drop_filtered_tweet(reasons))
+
+    def test_tweet_filter_keeps_normal_luleburgaz_posts(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        samples = [
+            {
+                "user_handle": "Ahmet1987",
+                "user_name": "Ahmet",
+                "text": "#lüleburgaz deprem oldu https://t.co/x",
+            },
+            {
+                "user_handle": "Ahmet12345",
+                "user_name": "Ahmet",
+                "text": "#lüleburgaz deprem oldu https://t.co/x",
+            },
+            {
+                "user_handle": "Ahmet123456",
+                "user_name": "Ahmet",
+                "text": (
+                    "#lüleburgaz belediyesi yaz konserleri programını "
+                    "bu akşam kamuoyuyla paylaştı https://t.co/x"
+                ),
+            },
+            {
+                "user_handle": "Trakya_Duyuru",
+                "user_name": "Trakya Duyuru",
+                "text": (
+                    "Çorlu, Çerkezköy, Kapaklı, Tekirdağ ve Lüleburgaz "
+                    "ilçelerinde sağanak yağış bekleniyor https://t.co/x"
+                ),
+            },
+        ]
+
+        for index, tweet in enumerate(samples):
+            with self.subTest(index=index):
+                tweet["link"] = f"https://x.com/test/status/{index}"
+                reasons = evaluate_tweet_filter(config, "Lüleburgaz", tweet)
+
+                self.assertFalse(should_drop_filtered_tweet(reasons))
+
+    def test_luleburgaz_campaign_rule_does_not_apply_to_other_queries(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Babaeski",
+            {
+                "user_handle": "sinan1050001",
+                "user_name": "sinan",
+                "text": "Hayırlı akşamlar BABAESKİ DEN https://t.co/x",
+                "link": "https://x.com/sinan1050001/status/1",
+            },
+        )
+
+        self.assertFalse(should_drop_filtered_tweet(reasons))
+
     def test_tweet_filter_keeps_natural_reply_without_link(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = Config.from_env()
