@@ -11,6 +11,27 @@ Kırklareli odaklı açık kaynak takip botu. Servis, belirlenen X/Twitter arama
 
 Dashboard bu aşamada kaldırıldı. Arayüz daha sonra ihtiyaçlara göre sıfırdan hazırlanacak.
 
+## Cloudflare shadow sürümü
+
+`cloudflare/` dizini mevcut Dokploy servisinden bağımsız çalışan Workers + Cron + D1
+sürümünü içerir. İlk dağıtım `DELIVERY_MODE=shadow` ayarıyla yapılır: tweet ve haberler
+çekilip D1'a kaydedilir, ancak Telegram'a gönderilmez. Böylece Cloudflare ve Dokploy
+bir süre çift bildirim üretmeden karşılaştırılabilir. Canlıya geçişte yalnızca bu değer
+`live` yapılır; D1'daki benzersiz bağlantılar daha önce gözlenen içeriklerin yeniden
+gönderilmesini engeller.
+
+```bash
+cd cloudflare
+npm install
+npm test
+npm run check
+npx wrangler d1 migrations apply lastmonitor-shadow --remote
+npm run deploy
+```
+
+`RAPIDAPI_KEY`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` ve `API_TOKEN` değerleri
+repoya yazılmaz; `wrangler secret put` ile Cloudflare Secrets içinde tutulur.
+
 ## Kurulum
 
 ```bash

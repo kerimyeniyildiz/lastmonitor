@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lastmonitor-cloudflare",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-19",
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lastmonitor-shadow",
+      "database_id": "98e8b2c1-0a10-427d-a73c-016676de7898",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "DELIVERY_MODE": "shadow",
+    "QUERY_TYPE": "Latest",
+    "TWEET_LIMIT": "20",
+    "QUERY_SCHEDULE": "Kofçaz|30m,Pehlivanköy|30m,Demirköy|30m,Pınarhisar|30m,Babaeski|30m,KirklareliEmn|5m,Lüleburgaz|15m,Valikirklareli|5m,Kırklareli|2m,from:mustafaciftcitr|10m",
+    "TWEET_FILTER_MODE": "drop",
+    "BLOCKED_TWEET_TERMS": "escort,kırklarelibayan,kırklarelieskort,kırklareliesc",
+    "WATCH_TWEET_TERMS": "ücret elden,ucret elden,ödeme elden,odeme elden,ev otel,apart rezidans,otel rezidans",
+    "LOCATION_HASHTAG_TERMS": "kırklareli,kirklareli,lüleburgaz,luleburgaz,babaeski,pınarhisar,pinarhisar,kofçaz,kofcaz,demirköy,demirkoy,pehlivanköy,pehlivankoy,kapaklı,kapakli,tekirdağ,tekirdag,edirne",
+    "TWEET_FILTER_BYPASS_QUERIES": "from:mustafaciftcitr,Valikirklareli,KirklareliEmn",
+    "NEWS_LIMIT": "10",
+    "NEWS_MAX_AGE_HOURS": "72",
+    "NEWS_INTERVAL_SECONDS": "600",
+    "SITEMAP_URLS": "https://www.onadimgazetesi.com/sitemap.xml",
+    "SITEMAP_MONTHLY_TEMPLATES": "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
+    "SITEMAP_MONTH_LOOKBACK": "1",
+    "API_REQUIRE_TOKEN": "true"
+  }
+}
