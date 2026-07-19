@@ -196,7 +196,7 @@ class TweetParsingTests(unittest.TestCase):
             },
         )
 
-        self.assertIn("watch_pattern:location_hashtags_link_only", reasons)
+        self.assertIn("block_pattern:location_hashtags_link_only", reasons)
         self.assertTrue(should_drop_filtered_tweet(reasons))
 
     def test_tweet_filter_drops_one_location_hashtag_plus_empty_hashtag_link(self) -> None:
@@ -214,7 +214,7 @@ class TweetParsingTests(unittest.TestCase):
             },
         )
 
-        self.assertIn("watch_pattern:location_hashtags_link_only", reasons)
+        self.assertIn("block_pattern:location_hashtags_link_only", reasons)
         self.assertTrue(should_drop_filtered_tweet(reasons))
 
     def test_tweet_filter_drops_location_word_soup_links(self) -> None:
@@ -232,7 +232,7 @@ class TweetParsingTests(unittest.TestCase):
             },
         )
 
-        self.assertIn("watch_pattern:location_word_soup_link", reasons)
+        self.assertIn("block_pattern:location_word_soup_link", reasons)
         self.assertTrue(should_drop_filtered_tweet(reasons))
 
     def test_tweet_filter_drops_suspicious_generated_handle_location_links(self) -> None:
@@ -250,7 +250,7 @@ class TweetParsingTests(unittest.TestCase):
             },
         )
 
-        self.assertIn("watch_pattern:suspicious_location_link", reasons)
+        self.assertIn("block_pattern:suspicious_location_link", reasons)
         self.assertTrue(should_drop_filtered_tweet(reasons))
 
     def test_tweet_filter_drops_luleburgaz_short_link_campaign(self) -> None:
@@ -270,7 +270,7 @@ class TweetParsingTests(unittest.TestCase):
             ("Joan70019329190", "Joan", "#lüleburgaz uygun ve"),
             ("Jonas448468", "Jonas", "Gözlerin olacak #lüleburgaz"),
         ]
-        reason = "watch_pattern:luleburgaz_short_link_campaign"
+        reason = "block_pattern:luleburgaz_short_link_campaign"
 
         for index, (handle, name, text) in enumerate(samples):
             with self.subTest(handle=handle):
@@ -324,7 +324,7 @@ class TweetParsingTests(unittest.TestCase):
                 )
 
                 self.assertIn(
-                    "watch_pattern:generated_location_link_campaign", reasons
+                    "block_pattern:generated_location_link_campaign", reasons
                 )
                 self.assertTrue(should_drop_filtered_tweet(reasons))
 
@@ -364,8 +364,8 @@ class TweetParsingTests(unittest.TestCase):
             },
         )
 
-        self.assertIn("watch_pattern:luleburgaz_ad_profile", reasons)
-        self.assertIn("watch_pattern:luleburgaz_location_dump", reasons)
+        self.assertIn("block_pattern:luleburgaz_ad_profile", reasons)
+        self.assertIn("block_pattern:luleburgaz_location_dump", reasons)
         self.assertTrue(should_drop_filtered_tweet(reasons))
 
     def test_tweet_filter_keeps_normal_luleburgaz_posts(self) -> None:

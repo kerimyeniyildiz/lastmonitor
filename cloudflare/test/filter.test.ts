@@ -40,7 +40,7 @@ describe("tweet filtering parity", () => {
     ];
     for (const [handle, name, text] of samples) {
       const reasons = evaluateTweetFilter(config, "Lüleburgaz", tweet(handle, name, text));
-      expect(reasons).toContain("watch_pattern:luleburgaz_short_link_campaign");
+      expect(reasons).toContain("block_pattern:luleburgaz_short_link_campaign");
       expect(shouldDropTweet(reasons)).toBe(true);
     }
   });
@@ -72,7 +72,7 @@ describe("tweet filtering parity", () => {
     ];
     for (const item of samples) {
       const reasons = evaluateTweetFilter(config, "Kırklareli", item);
-      expect(reasons).toContain("watch_pattern:generated_location_link_campaign");
+      expect(reasons).toContain("block_pattern:generated_location_link_campaign");
       expect(shouldDropTweet(reasons)).toBe(true);
     }
   });

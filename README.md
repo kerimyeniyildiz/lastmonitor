@@ -75,6 +75,8 @@ TWEET_FILTER_BYPASS_QUERIES=from:mustafaciftcitr,Valikirklareli,KirklareliEmn
 
 `drop` modunda güvenli görülen spamler Telegram'a gönderilmez. Şu an `BLOCKED_TWEET_TERMS` eşleşmeleri, sadece lokasyon hashtag'i + link içeren paylaşımlar ve rakam ekli üretilmiş hesapların kısa lokasyon-link kampanyaları düşürülür. `WATCH_TWEET_TERMS` ve telefon numarası gibi diğer sinyaller logda kalır; yanlış pozitif riskini ölçmeden bunlara göre susturma yapılmaz. Geçici gözlem için `TWEET_FILTER_MODE=log`, tamamen kapatmak için `TWEET_FILTER_MODE=off` kullanılabilir. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
 
+Filtre nedenlerinde `blocked_term:*` ve `block_pattern:*` Telegram'a gönderilmeyen kesin kararları, `watch_term:*` ve `watch_pattern:phone_number` ise yalnızca ölçülen sinyalleri ifade eder.
+
 Lüleburgaz sorgusunda gözlenen otomatik reklam kampanyası ayrıca birleşik sinyallerle süzülür. Yalnızca uzun rakam dizili kullanıcı adı, konum, link, tek kelimelik görünen ad ve en fazla üç artık kelime birlikteyse kısa kalıp düşürülür. Aynı kapsamda reklam ifadeli profil adları ve virgülle oluşturulmuş uzun konum listeleri de engellenir; bu kurallar diğer sorgulara uygulanmaz.
 
 Haber kaynakları varsayılan olarak iki sitemap kullanır:
