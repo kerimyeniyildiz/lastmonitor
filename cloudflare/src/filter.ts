@@ -33,7 +33,7 @@ function escapeRegex(value: string): string {
 }
 
 export function compactText(value: string): string {
-  return value.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  return value.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 function textContainsTerm(haystackLower: string, haystackCompact: string, term: string): boolean {

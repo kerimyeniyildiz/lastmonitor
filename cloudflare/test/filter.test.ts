@@ -18,6 +18,17 @@ function tweet(handle: string, name: string, text: string): Tweet {
 }
 
 describe("tweet filtering parity", () => {
+  it("normalizes stylized Unicode blocked terms", () => {
+    const reasons = evaluateTweetFilter(
+      config,
+      "Kırklareli",
+      tweet("Aaaaadcnc", "Random", "#kırklareli 𝕰𝕾𝕮𝕺𝕽𝕿 serbestsin"),
+    );
+
+    expect(reasons).toContain("blocked_term:escort");
+    expect(shouldDropTweet(reasons)).toBe(true);
+  });
+
   it("drops the observed Luleburgaz short-link campaign", () => {
     const samples = [
       ["Richard78459041", "Richard", "#lüleburgaz Verilerin dolup"],

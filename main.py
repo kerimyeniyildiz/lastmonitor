@@ -867,7 +867,8 @@ def matches_query(search_query: str, tweet: Dict) -> bool:
 
 
 def compact_text(value: str) -> str:
-    return "".join(ch for ch in value.lower() if ch.isalnum())
+    normalized = unicodedata.normalize("NFKC", value or "").lower()
+    return "".join(ch for ch in normalized if ch.isalnum())
 
 
 def text_contains_term(haystack_lower: str, haystack_compact: str, term: str) -> bool:

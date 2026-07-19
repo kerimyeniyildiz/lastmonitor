@@ -127,6 +127,24 @@ class TweetParsingTests(unittest.TestCase):
 
         self.assertEqual(reasons, ["blocked_term:e s c o r t"])
 
+    def test_tweet_filter_matches_stylized_unicode_blocked_term(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            config = Config.from_env()
+
+        reasons = evaluate_tweet_filter(
+            config,
+            "Kırklareli",
+            {
+                "user_handle": "Aaaaadcnc",
+                "user_name": "Random",
+                "text": "#kırklareli 𝕰𝕾𝕮𝕺𝕽𝕿 serbestsin https://t.co/x",
+                "link": "https://x.com/Aaaaadcnc/status/1",
+            },
+        )
+
+        self.assertIn("blocked_term:escort", reasons)
+        self.assertTrue(should_drop_filtered_tweet(reasons))
+
     def test_tweet_filter_matches_kirklareli_ad_terms_case_insensitive(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             config = Config.from_env()
