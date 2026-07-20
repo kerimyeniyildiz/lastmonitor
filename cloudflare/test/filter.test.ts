@@ -63,6 +63,29 @@ describe("tweet filtering parity", () => {
     }
   });
 
+  it("drops dense Luleburgaz location ads without relying on handle shape", () => {
+    const item = tweet(
+      "janagama_ravi",
+      "ÇITIR KIZLAR",
+      "Her şey güzel olacak 💞 çorlu,çerkezköy,kapaklı,tekirdağ,lüleburgaz,şarkköy,malkara,hayrabolu,saray,ergene,muratlı,marmaraereğlisi,bayan,",
+    );
+
+    const reasons = evaluateTweetFilter(config, "Lüleburgaz", item);
+
+    expect(reasons).toContain("block_pattern:luleburgaz_location_dump");
+    expect(shouldDropTweet(reasons)).toBe(true);
+  });
+
+  it("keeps ordinary Luleburgaz tweets that use the word bayan", () => {
+    const item = tweet(
+      "yerelhaber",
+      "Yerel Haber",
+      "Lüleburgaz'da kayıp bayan için arama çalışması başlatıldı",
+    );
+
+    expect(shouldDropTweet(evaluateTweetFilter(config, "Lüleburgaz", item))).toBe(false);
+  });
+
   it("keeps normal Luleburgaz announcements", () => {
     const samples = [
       tweet("Ahmet1987", "Ahmet", "#lüleburgaz deprem oldu"),

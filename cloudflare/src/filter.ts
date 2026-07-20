@@ -203,12 +203,23 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
     }
 
     const profile = `${tweet.userHandle} ${tweet.userName}`.toLowerCase();
+    const campaignText = tweet.text.toLowerCase();
+    const hasCampaignProfileTerm = LULEBURGAZ_CAMPAIGN_PROFILE_TERMS.some(
+      (term) => profile.includes(term) || campaignText.includes(term),
+    );
     if (
       profileCampaignHandle &&
       campaignLocationMentions >= 1 &&
-      LULEBURGAZ_CAMPAIGN_PROFILE_TERMS.some((term) => profile.includes(term))
+      hasCampaignProfileTerm
     ) {
       reasons.push("block_pattern:luleburgaz_ad_profile");
+    }
+    if (
+      campaignLocationMentions >= 5 &&
+      countChar(tweet.text, ",") >= 5 &&
+      hasCampaignProfileTerm
+    ) {
+      reasons.push("block_pattern:luleburgaz_location_dump");
     }
     if (profileCampaignHandle && campaignLocationMentions >= 3 && countChar(tweet.text, ",") >= 5) {
       reasons.push("block_pattern:luleburgaz_location_dump");
