@@ -9,16 +9,15 @@ Kırklareli odaklı açık kaynak takip botu. Servis, belirlenen X/Twitter arama
 - `Dockerfile.worker`: Worker servisini çalıştırır.
 - `Dockerfile.api`: API servisini çalıştırır.
 
-Dashboard bu aşamada kaldırıldı. Arayüz daha sonra ihtiyaçlara göre sıfırdan hazırlanacak.
+Cloudflare sürümü canlı akış ve istatistik dashboard'ını da sunar:
+https://onleme.kerimyeniyildiz.com.tr
 
-## Cloudflare shadow sürümü
+## Cloudflare sürümü
 
 `cloudflare/` dizini mevcut Dokploy servisinden bağımsız çalışan Workers + Cron + D1
-sürümünü içerir. İlk dağıtım `DELIVERY_MODE=shadow` ayarıyla yapılır: tweet ve haberler
-çekilip D1'a kaydedilir, ancak Telegram'a gönderilmez. Böylece Cloudflare ve Dokploy
-bir süre çift bildirim üretmeden karşılaştırılabilir. Canlıya geçişte yalnızca bu değer
-`live` yapılır; D1'daki benzersiz bağlantılar daha önce gözlenen içeriklerin yeniden
-gönderilmesini engeller.
+sürümünü içerir. Canlı ortam `DELIVERY_MODE=live` ile Telegram teslimatı yapar;
+D1'daki benzersiz bağlantılar daha önce gözlenen içeriklerin yeniden gönderilmesini
+engeller. Dashboard statik dosyaları aynı Worker üzerinden sunulur.
 
 ```bash
 cd cloudflare
@@ -28,6 +27,10 @@ npm run check
 npx wrangler d1 migrations apply lastmonitor-shadow --remote
 npm run deploy
 ```
+
+Dashboard geliştirme sunucusu `npm run dev`, Worker geliştirme sunucusu ise
+`npm run worker:dev` ile başlatılır. Üretim dağıtımı Vite arayüzünü derler ve Worker,
+cron, D1 API'leri ile statik dosyaları birlikte yayınlar.
 
 `RAPIDAPI_KEY`, `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` ve `API_TOKEN` değerleri
 repoya yazılmaz; `wrangler secret put` ile Cloudflare Secrets içinde tutulur.
@@ -120,6 +123,8 @@ uvicorn api:app --host 0.0.0.0 --port 8000
 Endpointler:
 
 - `GET /health`
+- `GET /api/dashboard/feed` (public, cursor tabanlı canlı akış)
+- `GET /api/dashboard/stats` (public dashboard istatistikleri)
 - `GET /tweets` (varsayılan `status=sent`; ayrıca `status=filtered` ve `status=all`)
 - `GET /news`
 - `GET /stats/daily`

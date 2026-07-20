@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111820" />
+    <title>Kırklareli Canlı İzleme</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2212%22 fill=%22%23111820%22/><circle cx=%2232%22 cy=%2232%22 r=%2215%22 fill=%22none%22 stroke=%22%2325a18e%22 stroke-width=%226%22/><circle cx=%2232%22 cy=%2232%22 r=%224%22 fill=%22%23ffffff%22/></svg>" />
+    <script type="module" crossorigin src="/assets/index-CFOz4ktZ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DKz72gTT.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand-lockup">
+        <span class="brand-mark"><i data-lucide="activity"></i></span>
+        <div>
+          <h1>Kırklareli Canlı İzleme</h1>
+          <p>Haber ve sosyal medya akışı</p>
+        </div>
+      </div>
+
+      <div class="mobile-view-switch" role="tablist" aria-label="Mobil görünüm">
+        <button class="mobile-view-button is-active" data-mobile-view="feed" role="tab">Akış</button>
+        <button class="mobile-view-button" data-mobile-view="stats" role="tab">İstatistik</button>
+      </div>
+
+      <div class="header-status">
+        <span class="live-state"><span class="live-dot"></span>Canlı</span>
+        <span id="lastUpdated" class="last-updated">Güncelleniyor</span>
+        <button id="refreshButton" class="icon-button" type="button" title="Verileri yenile" aria-label="Verileri yenile">
+          <i data-lucide="refresh-cw"></i>
+        </button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section id="feedPanel" class="feed-panel mobile-panel-active" aria-labelledby="feedTitle">
+        <div class="feed-toolbar">
+          <div class="section-heading">
+            <div>
+              <h2 id="feedTitle">Canlı Akış</h2>
+              <p id="feedSummary">Son bildirimler yükleniyor</p>
+            </div>
+            <button id="autoFlowButton" class="flow-toggle is-active" type="button" aria-pressed="true">
+              <i data-lucide="radio"></i>
+              Otomatik akış
+            </button>
+          </div>
+
+          <div class="feed-controls">
+            <div id="feedTabs" class="segmented-control" role="tablist" aria-label="Akış türü">
+              <button class="segment is-active" data-view="all" role="tab">Tümü</button>
+              <button class="segment" data-view="tweets" role="tab">Tweetler</button>
+              <button class="segment" data-view="news" role="tab">Haberler</button>
+              <button class="segment" data-view="filtered" role="tab">Engellenenler</button>
+            </div>
+            <label class="search-control">
+              <i data-lucide="search"></i>
+              <input id="feedSearch" type="search" placeholder="Akışta ara" autocomplete="off" />
+            </label>
+          </div>
+        </div>
+
+        <button id="newItemsButton" class="new-items-button" type="button" hidden></button>
+        <div id="feedScroller" class="feed-scroller">
+          <div id="feedList" class="feed-list" aria-live="polite"></div>
+          <div id="feedEmpty" class="empty-state" hidden>
+            <i data-lucide="inbox"></i>
+            <strong>Kayıt bulunamadı</strong>
+            <span>Filtreyi veya arama metnini değiştirin.</span>
+          </div>
+          <div class="feed-footer">
+            <button id="loadMoreButton" class="load-more-button" type="button">Daha fazla göster</button>
+          </div>
+        </div>
+      </section>
+
+      <aside id="statsPanel" class="stats-panel" aria-labelledby="statsTitle">
+        <div class="stats-header">
+          <div>
+            <h2 id="statsTitle">İstatistikler</h2>
+            <p>İstanbul saatine göre güncel görünüm</p>
+          </div>
+          <span id="statsFreshness" class="data-freshness">Hazırlanıyor</span>
+        </div>
+
+        <div id="statsContent" class="stats-content">
+          <section class="period-metrics" aria-label="Tweet ve haber sayıları">
+            <div class="metric-row metric-row-tweet">
+              <div class="metric-label"><i data-lucide="bird"></i><span>Benzersiz tweet</span></div>
+              <div class="period-values">
+                <div><span>Bugün</span><strong data-stat="tweets.today">–</strong></div>
+                <div><span>Bu hafta</span><strong data-stat="tweets.week">–</strong></div>
+                <div><span>Bu ay</span><strong data-stat="tweets.month">–</strong></div>
+                <div><span>Bu yıl</span><strong data-stat="tweets.year">–</strong></div>
+              </div>
+            </div>
+            <div class="metric-row metric-row-news">
+              <div class="metric-label"><i data-lucide="newspaper"></i><span>Gelen haber</span></div>
+              <div class="period-values">
+                <div><span>Bugün</span><strong data-stat="news.today">–</strong></div>
+                <div><span>Bu hafta</span><strong data-stat="news.week">–</strong></div>
+                <div><span>Bu ay</span><strong data-stat="news.month">–</strong></div>
+                <div><span>Bu yıl</span><strong data-stat="news.year">–</strong></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="spam-summary" aria-labelledby="spamTitle">
+            <div class="stat-section-title">
+              <span class="section-icon danger"><i data-lucide="shield-x"></i></span>
+              <div><h3 id="spamTitle">Engellenen spam</h3><p>Otomatik filtre kararları</p></div>
+            </div>
+            <div class="spam-primary">
+              <div><strong data-stat="spam.today">–</strong><span>bugün engellendi</span></div>
+              <div><strong data-stat="spam.rate_today" data-suffix="%">–</strong><span>bugünkü spam oranı</span></div>
+            </div>
+            <div class="spam-periods">
+              <span>Bu hafta <strong data-stat="spam.week">–</strong></span>
+              <span>Bu ay <strong data-stat="spam.month">–</strong></span>
+              <span>Bu yıl <strong data-stat="spam.year">–</strong></span>
+            </div>
+          </section>
+
+          <section class="activity-section" aria-labelledby="activityTitle">
+            <div class="stat-section-title split-title">
+              <div class="title-with-icon">
+                <span class="section-icon"><i data-lucide="bar-chart-3"></i></span>
+                <div><h3 id="activityTitle">Aktivite</h3><p>Tweet ve haber yoğunluğu</p></div>
+              </div>
+              <div class="chart-legend"><span class="tweet-legend">Tweet</span><span class="news-legend">Haber</span></div>
+            </div>
+            <div class="chart-block">
+              <div class="chart-caption"><strong>Son 24 saat</strong><span>Saatlik</span></div>
+              <div id="hourlyChart" class="bar-chart hourly-chart"></div>
+            </div>
+            <div class="chart-block compact-chart-block">
+              <div class="chart-caption"><strong>Son 14 gün</strong><span>Günlük</span></div>
+              <div id="dailyChart" class="bar-chart daily-chart"></div>
+            </div>
+          </section>
+
+          <section class="accounts-section" aria-labelledby="accountsTitle">
+            <div class="stat-section-title">
+              <span class="section-icon"><i data-lucide="users-round"></i></span>
+              <div><h3 id="accountsTitle">Kırklareli hakkında en çok tweet atanlar</h3><p>Bu ay · Kırklareli kelime sorgusu</p></div>
+            </div>
+            <div id="topAccounts" class="accounts-list"></div>
+          </section>
+
+          <section class="system-section" aria-labelledby="systemTitle">
+            <div class="stat-section-title">
+              <span class="section-icon neutral"><i data-lucide="clock-3"></i></span>
+              <div><h3 id="systemTitle">Sistem durumu</h3><p>Son kontrol kayıtları</p></div>
+            </div>
+            <div class="system-events">
+              <div class="system-event success-event">
+                <i data-lucide="check-circle-2"></i>
+                <div><span>Son başarılı kontrol</span><strong id="lastSuccess">–</strong><small id="lastSuccessTarget"></small></div>
+              </div>
+              <div class="system-event error-event">
+                <i data-lucide="triangle-alert"></i>
+                <div><span>Son hata</span><strong id="lastError">–</strong><small id="lastErrorMessage"></small></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </aside>
+    </main>
+
+  </body>
+</html>

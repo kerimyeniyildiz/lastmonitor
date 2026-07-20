@@ -1,4 +1,5 @@
 import { parseBoolean } from "./config";
+import { dashboardFeed, dashboardStats } from "./dashboard";
 import type { AppConfig, Env } from "./types";
 import { runDueMonitors, sendTelegram } from "./monitor";
 
@@ -148,6 +149,12 @@ export async function handleRequest(
     } catch (error) {
       return json({ status: "error", error: error instanceof Error ? error.message : String(error) }, 503);
     }
+  }
+  if (request.method === "GET" && url.pathname === "/api/dashboard/feed") {
+    return dashboardFeed(url, env);
+  }
+  if (request.method === "GET" && url.pathname === "/api/dashboard/stats") {
+    return dashboardStats(env);
   }
   if (!isAuthorized(request, env)) return json({ detail: "Unauthorized" }, 401);
   if (request.method === "GET" && url.pathname === "/status") return status(env, config);
