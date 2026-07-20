@@ -1,6 +1,7 @@
 import type { AppConfig, Tweet } from "./types";
 
 export const DROPPABLE_FILTER_REASONS = new Set([
+  "required_prefix_missing",
   "block_pattern:location_hashtags_link_only",
   "block_pattern:location_word_soup_link",
   "block_pattern:suspicious_location_link",
@@ -117,13 +118,20 @@ function queryBypassesFilter(config: AppConfig, query: string): boolean {
 }
 
 export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Tweet): string[] {
-  if (config.tweetFilterMode === "off" || queryBypassesFilter(config, query)) return [];
+  const reasons: string[] = [];
+  const requiredPrefix = config.tweetRequiredPrefixes[query.trim().toLowerCase()];
+  if (requiredPrefix) {
+    const normalizedText = tweet.text.normalize("NFKC").trimStart().toLocaleUpperCase("tr-TR");
+    const normalizedPrefix = requiredPrefix.normalize("NFKC").toLocaleUpperCase("tr-TR");
+    if (!normalizedText.startsWith(normalizedPrefix)) {
+      reasons.push("required_prefix_missing");
+    }
+  }
+  if (config.tweetFilterMode === "off" || queryBypassesFilter(config, query)) return reasons;
 
   const haystack = [tweet.text, tweet.userHandle, tweet.userName, tweet.link].join(" ");
   const haystackLower = haystack.toLowerCase();
   const haystackCompact = compactText(haystack);
-  const reasons: string[] = [];
-
   for (const term of config.blockedTweetTerms) {
     const cleaned = term.trim().toLowerCase();
     if (textContainsTerm(haystackLower, haystackCompact, cleaned)) {

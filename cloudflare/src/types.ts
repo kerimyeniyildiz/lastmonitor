@@ -13,6 +13,7 @@ export interface Env {
   WATCH_TWEET_TERMS?: string;
   LOCATION_HASHTAG_TERMS?: string;
   TWEET_FILTER_BYPASS_QUERIES?: string;
+  TWEET_REQUIRED_PREFIXES?: string;
   NEWS_LIMIT?: string;
   NEWS_MAX_AGE_HOURS?: string;
   NEWS_INTERVAL_SECONDS?: string;
@@ -37,6 +38,7 @@ export interface AppConfig {
   watchTweetTerms: string[];
   locationHashtagTerms: string[];
   tweetFilterBypassQueries: string[];
+  tweetRequiredPrefixes: Record<string, string>;
   newsLimit: number;
   newsMaxAgeHours: number;
   newsIntervalSeconds: number;

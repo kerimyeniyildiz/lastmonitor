@@ -165,6 +165,24 @@ def parse_list(value: Optional[str]) -> List[str]:
     return [item.strip() for item in normalized.split(",") if item.strip()]
 
 
+def parse_required_prefixes(value: Optional[str]) -> Dict[str, str]:
+    prefixes: Dict[str, str] = {}
+    for item in parse_list(value):
+        if "=>" not in item:
+            continue
+        query, prefix = item.split("=>", 1)
+        query = query.strip().lower()
+        prefix = prefix.strip()
+        if query and prefix:
+            prefixes[query] = prefix
+    return prefixes
+
+
+def normalize_prefix_match(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value)
+    return normalized.translate(str.maketrans({"I": "ı", "İ": "i"})).lower()
+
+
 @dataclass
 class QuerySchedule:
     query: str
@@ -308,6 +326,7 @@ class Config:
     watch_tweet_terms: List[str]
     location_hashtag_terms: List[str]
     tweet_filter_bypass_queries: List[str]
+    tweet_required_prefixes: Dict[str, str]
     queries_schedule: List[QuerySchedule]
     db_url: str
     instagram_enable: bool
@@ -399,6 +418,9 @@ class Config:
                     "TWEET_FILTER_BYPASS_QUERIES",
                     ",".join(DEFAULT_TWEET_FILTER_BYPASS_QUERIES),
                 )
+            ),
+            tweet_required_prefixes=parse_required_prefixes(
+                os.environ.get("TWEET_REQUIRED_PREFIXES")
             ),
             queries_schedule=parse_query_schedule(
                 schedule_raw, default_query, default_interval
@@ -949,18 +971,25 @@ def query_bypasses_tweet_filter(config: Config, search_query: str) -> bool:
 
 
 def evaluate_tweet_filter(config: Config, search_query: str, tweet: Dict) -> List[str]:
+    reasons: List[str] = []
+    required_prefix = config.tweet_required_prefixes.get(
+        (search_query or "").strip().lower()
+    )
+    if required_prefix:
+        text = unicodedata.normalize("NFKC", str(tweet.get("text") or "")).lstrip()
+        prefix = unicodedata.normalize("NFKC", required_prefix)
+        if not normalize_prefix_match(text).startswith(normalize_prefix_match(prefix)):
+            reasons.append("required_prefix_missing")
     if config.tweet_filter_mode == "off" or query_bypasses_tweet_filter(
         config, search_query
     ):
-        return []
+        return reasons
 
     haystack = " ".join(
         str(tweet.get(key) or "") for key in ("text", "user_handle", "user_name", "link")
     )
     haystack_lower = haystack.lower()
     haystack_compact = compact_text(haystack)
-    reasons: List[str] = []
-
     for term in config.blocked_tweet_terms:
         clean_term = term.strip().lower()
         if not clean_term:
@@ -1058,7 +1087,9 @@ def evaluate_tweet_filter(config: Config, search_query: str, tweet: Dict) -> Lis
 def should_drop_filtered_tweet(reasons: List[str]) -> bool:
     droppable_reasons = set(DEFAULT_DROPPABLE_FILTER_REASONS)
     return any(
-        reason.startswith("blocked_term:") or reason in droppable_reasons
+        reason.startswith("blocked_term:")
+        or reason == "required_prefix_missing"
+        or reason in droppable_reasons
         for reason in reasons
     )
 
@@ -1404,8 +1435,11 @@ def tweet_loop(
                     filter_reasons = evaluate_tweet_filter(config, item.query, tweet)
                     if filter_reasons:
                         should_drop = (
-                            config.tweet_filter_mode == "drop"
-                            and should_drop_filtered_tweet(filter_reasons)
+                            "required_prefix_missing" in filter_reasons
+                            or (
+                                config.tweet_filter_mode == "drop"
+                                and should_drop_filtered_tweet(filter_reasons)
+                            )
                         )
                         log(
                             "tweet filter match "

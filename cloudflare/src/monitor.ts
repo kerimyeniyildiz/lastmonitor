@@ -36,7 +36,9 @@ export async function runTweetTarget(
     fetchedCount = tweets.length;
     for (const tweet of tweets) {
       const reasons = evaluateTweetFilter(config, query, tweet);
-      const filtered = config.tweetFilterMode === "drop" && shouldDropTweet(reasons);
+      const requiredPrefixMissing = reasons.includes("required_prefix_missing");
+      const filtered = requiredPrefixMissing ||
+        (config.tweetFilterMode === "drop" && shouldDropTweet(reasons));
       const initialStatus = filtered
         ? "filtered"
         : config.deliveryMode === "shadow"

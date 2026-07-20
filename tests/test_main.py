@@ -511,6 +511,34 @@ class TweetParsingTests(unittest.TestCase):
 
         self.assertEqual(reasons, [])
 
+    def test_tweet_filter_requires_configured_prefix_for_account_query(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"TWEET_REQUIRED_PREFIXES": "from:bpthaber=>SON DAKİKA"},
+            clear=True,
+        ):
+            config = Config.from_env()
+
+        matching = {
+            "user_handle": "bpthaber",
+            "user_name": "BPT",
+            "text": "  son dakika | Örnek gelişme",
+            "link": "https://x.com/bpthaber/status/1",
+        }
+        unrelated = {
+            **matching,
+            "text": "Günün öne çıkan haberleri",
+            "link": "https://x.com/bpthaber/status/2",
+        }
+
+        self.assertEqual(evaluate_tweet_filter(config, "from:bpthaber", matching), [])
+        reasons = evaluate_tweet_filter(config, "from:bpthaber", unrelated)
+        self.assertIn("required_prefix_missing", reasons)
+        self.assertTrue(should_drop_filtered_tweet(reasons))
+        self.assertEqual(
+            evaluate_tweet_filter(config, "from:mustafaciftcitr", unrelated), []
+        )
+
     def test_tweet_filter_can_be_turned_off(self) -> None:
         with patch.dict(os.environ, {"TWEET_FILTER_MODE": "off"}, clear=True):
             config = Config.from_env()

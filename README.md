@@ -71,9 +71,12 @@ BLOCKED_TWEET_TERMS=escort,kırklarelibayan,kırklarelieskort,kırklareliesc
 WATCH_TWEET_TERMS=ücret elden,ucret elden,ödeme elden,odeme elden,ev otel,apart rezidans,otel rezidans
 LOCATION_HASHTAG_TERMS=kırklareli,kirklareli,lüleburgaz,luleburgaz,babaeski,pınarhisar,pinarhisar,kofçaz,kofcaz,demirköy,demirkoy,pehlivanköy,pehlivankoy,kapaklı,kapakli,tekirdağ,tekirdag,edirne
 TWEET_FILTER_BYPASS_QUERIES=from:mustafaciftcitr,Valikirklareli,KirklareliEmn
+TWEET_REQUIRED_PREFIXES=from:bpthaber=>SON DAKİKA
 ```
 
 `drop` modunda güvenli görülen spamler Telegram'a gönderilmez. Şu an `BLOCKED_TWEET_TERMS` eşleşmeleri, sadece lokasyon hashtag'i + link içeren paylaşımlar ve rakam ekli üretilmiş hesapların kısa lokasyon-link kampanyaları düşürülür. `WATCH_TWEET_TERMS` ve telefon numarası gibi diğer sinyaller logda kalır; yanlış pozitif riskini ölçmeden bunlara göre susturma yapılmaz. Geçici gözlem için `TWEET_FILTER_MODE=log`, tamamen kapatmak için `TWEET_FILTER_MODE=off` kullanılabilir. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
+
+`TWEET_REQUIRED_PREFIXES`, `sorgu=>zorunlu başlangıç` biçimindedir. Bu kural genel spam filtresinden bağımsızdır; örneğin `from:bpthaber` için yalnızca `SON DAKİKA` ile başlayan tweetler teslim edilir.
 
 Filtre nedenlerinde `blocked_term:*` ve `block_pattern:*` Telegram'a gönderilmeyen kesin kararları, `watch_term:*` ve `watch_pattern:phone_number` ise yalnızca ölçülen sinyalleri ifade eder.
 

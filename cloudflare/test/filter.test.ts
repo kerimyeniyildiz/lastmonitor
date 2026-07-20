@@ -18,6 +18,24 @@ function tweet(handle: string, name: string, text: string): Tweet {
 }
 
 describe("tweet filtering parity", () => {
+  it("only keeps tweets with the configured query-specific prefix", () => {
+    const prefixConfig = loadConfig({
+      TWEET_REQUIRED_PREFIXES: "from:bpthaber=>SON DAKİKA",
+    } as Env);
+    const matching = tweet(
+      "bpthaber",
+      "BPT",
+      "  son dakika | Örnek gelişme",
+    );
+    const unrelated = tweet("bpthaber", "BPT", "Günün öne çıkan haberleri");
+
+    expect(evaluateTweetFilter(prefixConfig, "from:bpthaber", matching)).toEqual([]);
+    const reasons = evaluateTweetFilter(prefixConfig, "from:bpthaber", unrelated);
+    expect(reasons).toContain("required_prefix_missing");
+    expect(shouldDropTweet(reasons)).toBe(true);
+    expect(evaluateTweetFilter(prefixConfig, "from:mustafaciftcitr", unrelated)).toEqual([]);
+  });
+
   it("normalizes stylized Unicode blocked terms", () => {
     const reasons = evaluateTweetFilter(
       config,

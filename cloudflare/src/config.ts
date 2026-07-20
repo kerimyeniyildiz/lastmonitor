@@ -53,6 +53,18 @@ export function parseList(value: string | undefined, fallback: string[] = []): s
     .filter(Boolean);
 }
 
+export function parseRequiredPrefixes(value: string | undefined): Record<string, string> {
+  const prefixes: Record<string, string> = {};
+  for (const item of parseList(value)) {
+    const separator = item.indexOf("=>");
+    if (separator <= 0) continue;
+    const query = item.slice(0, separator).trim().toLowerCase();
+    const prefix = item.slice(separator + 2).trim();
+    if (query && prefix) prefixes[query] = prefix;
+  }
+  return prefixes;
+}
+
 export function parseInteger(value: string | undefined, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -114,6 +126,7 @@ export function loadConfig(env: Env): AppConfig {
       env.TWEET_FILTER_BYPASS_QUERIES,
       DEFAULT_BYPASS_QUERIES,
     ),
+    tweetRequiredPrefixes: parseRequiredPrefixes(env.TWEET_REQUIRED_PREFIXES),
     newsLimit: Math.max(1, parseInteger(env.NEWS_LIMIT, 10)),
     newsMaxAgeHours: Math.max(0, parseInteger(env.NEWS_MAX_AGE_HOURS, 72)),
     newsIntervalSeconds: Math.max(60, parseInteger(env.NEWS_INTERVAL_SECONDS, 600)),
