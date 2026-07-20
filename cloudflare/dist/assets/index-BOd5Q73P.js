@@ -24,7 +24,7 @@ lucide.createIcons({icons});\``);if(typeof r>"u")throw new Error("`createIcons()
         <span class="tweet-bar" style="height:${h}%"></span>
       </div>
       ${v?`<span class="chart-label">${m($)}</span>`:""}
-    </div>`}).join("")}function ce(e){const t=document.querySelector("#topAccounts");if(!e?.length){t.innerHTML='<div class="accounts-empty">Bu ay için kayıt bulunmuyor.</div>';return}const n=Math.max(...e.map(r=>Number(r.total||0)),1);t.innerHTML=e.map(r=>`
+    </div>`}).join("")}function ce(e){const t=document.querySelector("#topAccounts");if(!e?.length){t.innerHTML='<div class="accounts-empty">Bu yıl için kayıt bulunmuyor.</div>';return}const n=Math.max(...e.map(r=>Number(r.total||0)),1);t.innerHTML=e.map(r=>`
     <div class="account-row">
       <div class="account-info"><strong>${m(r.user_name||r.user_handle)}</strong><span>@${m(r.user_handle)}</span></div>
       <div class="account-track"><div class="account-bar" style="width:${Number(r.total||0)/n*100}%"></div></div>
