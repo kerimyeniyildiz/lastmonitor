@@ -6,6 +6,22 @@ const JSON_HEADERS = {
 };
 const ISTANBUL_OFFSET_MS = 3 * 60 * 60 * 1000;
 
+function normalizedTimestampSql(column: string): string {
+  return `datetime(
+    CASE
+      WHEN trim(${column}) GLOB '*[+-][0-9][0-9]' THEN trim(${column}) || ':00'
+      ELSE trim(${column})
+    END
+  )`;
+}
+
+function eventTimestampSql(createdColumn: string): string {
+  return `COALESCE(
+    ${normalizedTimestampSql(createdColumn)},
+    ${normalizedTimestampSql("fetched_at")}
+  )`;
+}
+
 interface FeedCursor {
   at: string;
   kind: string;
@@ -71,17 +87,19 @@ export function dashboardPeriodStarts(now = new Date()): {
 }
 
 function feedSource(view: string): string {
+  const tweetEventAt = eventTimestampSql("tweet_created_at");
+  const newsEventAt = eventTimestampSql("news_created_at");
   const tweets = (status: "sent" | "filtered") => `
     SELECT id AS item_id, 'tweet' AS kind, query, user_handle, user_name,
            text, link, NULL AS source, delivery_status, filter_reasons,
-           strftime('%Y-%m-%dT%H:%M:%fZ', datetime(COALESCE(tweet_created_at, fetched_at))) AS display_at
+           strftime('%Y-%m-%dT%H:%M:%fZ', ${tweetEventAt}) AS display_at
     FROM tweets
     WHERE delivery_status = '${status}'`;
   const news = `
     SELECT id AS item_id, 'news' AS kind, NULL AS query, NULL AS user_handle,
            NULL AS user_name, NULL AS text, link, source, delivery_status,
            '[]' AS filter_reasons,
-           strftime('%Y-%m-%dT%H:%M:%fZ', datetime(COALESCE(news_created_at, fetched_at))) AS display_at
+           strftime('%Y-%m-%dT%H:%M:%fZ', ${newsEventAt}) AS display_at
     FROM news
     WHERE delivery_status = 'sent'`;
   if (view === "tweets") return tweets("sent");
@@ -141,7 +159,7 @@ function periodCountSql(table: "tweets" | "news", status: string): string {
   const createdColumn = table === "tweets" ? "tweet_created_at" : "news_created_at";
   return `
     WITH records AS (
-      SELECT datetime(COALESCE(${createdColumn}, fetched_at)) AS event_at
+      SELECT ${eventTimestampSql(createdColumn)} AS event_at
       FROM ${table}
       WHERE delivery_status = '${status}'
     )
@@ -171,7 +189,7 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
       env.DB.prepare(
         `WITH records AS (
            SELECT delivery_status, filter_reasons,
-                  datetime(COALESCE(tweet_created_at, fetched_at)) AS event_at
+                  ${eventTimestampSql("tweet_created_at")} AS event_at
            FROM tweets
            WHERE delivery_status IN ('sent', 'filtered')
          )
@@ -188,7 +206,7 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
          FROM tweets
          WHERE query = 'Kırklareli'
            AND delivery_status = 'sent'
-           AND datetime(COALESCE(tweet_created_at, fetched_at)) >= ?
+           AND ${eventTimestampSql("tweet_created_at")} >= ?
            AND COALESCE(user_handle, '') <> ''
          GROUP BY LOWER(user_handle)
          ORDER BY total DESC, user_handle ASC
@@ -196,10 +214,10 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
       ).bind(starts.month),
       env.DB.prepare(
         `WITH activity AS (
-           SELECT 'tweet' AS kind, datetime(COALESCE(tweet_created_at, fetched_at)) AS event_at
+           SELECT 'tweet' AS kind, ${eventTimestampSql("tweet_created_at")} AS event_at
            FROM tweets WHERE delivery_status = 'sent'
            UNION ALL
-           SELECT 'news' AS kind, datetime(COALESCE(news_created_at, fetched_at)) AS event_at
+           SELECT 'news' AS kind, ${eventTimestampSql("news_created_at")} AS event_at
            FROM news WHERE delivery_status = 'sent'
          )
          SELECT strftime('%Y-%m-%d %H:00', event_at, '+3 hours') AS bucket,
@@ -212,10 +230,10 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
       ).bind(activitySince),
       env.DB.prepare(
         `WITH activity AS (
-           SELECT 'tweet' AS kind, datetime(COALESCE(tweet_created_at, fetched_at)) AS event_at
+           SELECT 'tweet' AS kind, ${eventTimestampSql("tweet_created_at")} AS event_at
            FROM tweets WHERE delivery_status = 'sent'
            UNION ALL
-           SELECT 'news' AS kind, datetime(COALESCE(news_created_at, fetched_at)) AS event_at
+           SELECT 'news' AS kind, ${eventTimestampSql("news_created_at")} AS event_at
            FROM news WHERE delivery_status = 'sent'
          )
          SELECT date(event_at, '+3 hours') AS bucket,
