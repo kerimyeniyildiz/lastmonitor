@@ -4,7 +4,7 @@ import { evaluateTweetFilter, shouldDropTweet } from "./filter";
 import { buildNewsMessage, fetchNewsEntries } from "./sitemap";
 import { buildTweetMessage, fetchLatestTweets } from "./twitter";
 
-async function sendTelegram(env: Env, text: string): Promise<void> {
+export async function sendTelegram(env: Env, text: string): Promise<void> {
   if (!env.TELEGRAM_TOKEN || !env.TELEGRAM_CHAT_ID) {
     throw new Error("Telegram secrets missing in live mode");
   }

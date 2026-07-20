@@ -1,6 +1,6 @@
 import { parseBoolean } from "./config";
 import type { AppConfig, Env } from "./types";
-import { runDueMonitors } from "./monitor";
+import { runDueMonitors, sendTelegram } from "./monitor";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -160,6 +160,13 @@ export async function handleRequest(
   if (request.method === "POST" && url.pathname === "/admin/run") {
     const results = await runDueMonitors(env, config, true);
     return json({ results });
+  }
+  if (request.method === "POST" && url.pathname === "/admin/telegram/test") {
+    await sendTelegram(
+      env,
+      "Lastmonitor Cloudflare gecis testi basarili.\n\nKaynak: Cloudflare Workers\nDurum: Telegram teslimati calisiyor.",
+    );
+    return json({ status: "ok" });
   }
   return json({ detail: "Not found" }, 404);
 }
