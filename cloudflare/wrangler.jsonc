@@ -23,7 +23,7 @@
     }
   ],
   "vars": {
-    "DELIVERY_MODE": "shadow",
+    "DELIVERY_MODE": "live",
     "QUERY_TYPE": "Latest",
     "TWEET_LIMIT": "20",
     "QUERY_SCHEDULE": "Kofçaz|30m,Pehlivanköy|30m,Demirköy|30m,Pınarhisar|30m,Babaeski|30m,KirklareliEmn|5m,Lüleburgaz|15m,Valikirklareli|5m,Kırklareli|2m,from:mustafaciftcitr|10m",
