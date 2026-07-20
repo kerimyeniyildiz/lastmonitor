@@ -1234,14 +1234,23 @@ def fetch_latest_tweets(
     return filtered
 
 
+TELEGRAM_MESSAGE_SAFE_LIMIT = 4000
+
+
 def build_tweet_message(tweet: Dict) -> str:
-    return (
+    header = (
         "🐦 Yeni Tweet\n\n"
         f"👤 Kullanıcı: {tweet['user_name']}\n"
-        f"💬 Tweet: {tweet['text']}\n"
-        f"🕒 Tarih: {tweet['created_at']}\n"
-        f"🔗 Link: {tweet['link']}"
+        "💬 Tweet: "
     )
+    footer = f"🕒 Tarih: {tweet['created_at']}\n🔗 Link: {tweet['link']}"
+    available_text_length = max(
+        1, TELEGRAM_MESSAGE_SAFE_LIMIT - len(header) - len(footer) - 1
+    )
+    text = str(tweet["text"])
+    if len(text) > available_text_length:
+        text = text[: available_text_length - 1].rstrip() + "…"
+    return f"{header}{text}\n{footer}"
 
 
 def month_offset(dt: datetime, offset: int) -> datetime:

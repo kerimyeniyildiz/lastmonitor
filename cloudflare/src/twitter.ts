@@ -143,6 +143,15 @@ export async function fetchLatestTweets(
   return tweets.slice(0, config.tweetLimit);
 }
 
+export const TELEGRAM_MESSAGE_SAFE_LIMIT = 4000;
+
+function truncateForTelegram(value: string, maxLength: number): string {
+  const characters = Array.from(value);
+  if (characters.length <= maxLength) return value;
+  if (maxLength <= 1) return "…";
+  return `${characters.slice(0, maxLength - 1).join("").trimEnd()}…`;
+}
+
 export function buildTweetMessage(tweet: Tweet): string {
   const createdAt = tweet.createdAt
     ? new Intl.DateTimeFormat("tr-TR", {
@@ -155,12 +164,13 @@ export function buildTweetMessage(tweet: Tweet): string {
         second: "2-digit",
       }).format(new Date(tweet.createdAt))
     : "Bilinmiyor";
-  return [
-    "🐦 Yeni Tweet",
-    "",
-    `👤 Kullanıcı: ${tweet.userName}`,
-    `💬 Tweet: ${tweet.text}`,
-    `🕒 Tarih: ${createdAt}`,
-    `🔗 Link: ${tweet.link}`,
-  ].join("\n");
+  const header = ["🐦 Yeni Tweet", "", `👤 Kullanıcı: ${tweet.userName}`, "💬 Tweet: "]
+    .join("\n");
+  const footer = [`🕒 Tarih: ${createdAt}`, `🔗 Link: ${tweet.link}`].join("\n");
+  const availableTextLength = Math.max(
+    1,
+    TELEGRAM_MESSAGE_SAFE_LIMIT - Array.from(header).length - Array.from(footer).length - 1,
+  );
+  const text = truncateForTelegram(tweet.text, availableTextLength);
+  return `${header}${text}\n${footer}`;
 }

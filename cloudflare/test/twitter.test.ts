@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { extractTweets, matchesQuery, normalizeTweet } from "../src/twitter";
+import {
+  TELEGRAM_MESSAGE_SAFE_LIMIT,
+  buildTweetMessage,
+  extractTweets,
+  matchesQuery,
+  normalizeTweet,
+} from "../src/twitter";
 
 describe("Twitter response normalization", () => {
   it("normalizes the RapidAPI shape and builds a link", () => {
@@ -34,5 +40,21 @@ describe("Twitter response normalization", () => {
     expect(matchesQuery("Kırklareli", item!)).toBe(true);
     expect(matchesQuery("from:mustafaciftcitr", item!)).toBe(true);
     expect(matchesQuery("from:başkası", item!)).toBe(false);
+  });
+
+  it("truncates long Telegram messages while preserving metadata and link", () => {
+    const item = normalizeTweet({
+      tweet_id: "long",
+      text: "A".repeat(5000),
+      created_at: "2026-07-20T17:00:00Z",
+      user_info: { screen_name: "haber", name: "Haber" },
+    });
+
+    const message = buildTweetMessage(item!);
+
+    expect(Array.from(message).length).toBeLessThanOrEqual(TELEGRAM_MESSAGE_SAFE_LIMIT);
+    expect(message).toContain("A…\n🕒 Tarih:");
+    expect(message).toContain("👤 Kullanıcı: Haber");
+    expect(message.endsWith("🔗 Link: https://x.com/haber/status/long")).toBe(true);
   });
 });

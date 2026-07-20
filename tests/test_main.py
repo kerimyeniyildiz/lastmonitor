@@ -8,7 +8,9 @@ from main import (
     Config,
     DBClient,
     ISTANBUL_TZ,
+    TELEGRAM_MESSAGE_SAFE_LIMIT,
     build_configured_sitemap_urls,
+    build_tweet_message,
     evaluate_tweet_filter,
     filter_news_entries,
     normalize_tweet,
@@ -732,6 +734,21 @@ class SitemapParsingTests(unittest.TestCase):
 
 
 class TelegramTests(unittest.TestCase):
+    def test_build_tweet_message_truncates_text_and_preserves_link(self) -> None:
+        tweet = {
+            "user_name": "Haber",
+            "text": "A" * 5000,
+            "created_at": "2026-07-20 20:00:00",
+            "link": "https://x.com/haber/status/long",
+        }
+
+        message = build_tweet_message(tweet)
+
+        self.assertLessEqual(len(message), TELEGRAM_MESSAGE_SAFE_LIMIT)
+        self.assertIn("A…\n🕒 Tarih:", message)
+        self.assertIn("👤 Kullanıcı: Haber", message)
+        self.assertTrue(message.endswith("🔗 Link: https://x.com/haber/status/long"))
+
     def test_send_telegram_message_returns_true_on_success(self) -> None:
         session = Mock()
         session.post.return_value = Mock(ok=True)
