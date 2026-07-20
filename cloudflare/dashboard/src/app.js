@@ -280,7 +280,7 @@ function renderChart(element, rows, type) {
 function renderAccounts(accounts) {
   const container = document.querySelector("#topAccounts");
   if (!accounts?.length) {
-    container.innerHTML = '<div class="accounts-empty">Bu ay için kayıt bulunmuyor.</div>';
+    container.innerHTML = '<div class="accounts-empty">Bu yıl için kayıt bulunmuyor.</div>';
     return;
   }
   const max = Math.max(...accounts.map((account) => Number(account.total || 0)), 1);

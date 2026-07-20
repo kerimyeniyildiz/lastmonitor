@@ -211,7 +211,7 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
          GROUP BY LOWER(user_handle)
          ORDER BY total DESC, user_handle ASC
          LIMIT 7`,
-      ).bind(starts.month),
+      ).bind(starts.year),
       env.DB.prepare(
         `WITH activity AS (
            SELECT 'tweet' AS kind, ${eventTimestampSql("tweet_created_at")} AS event_at
