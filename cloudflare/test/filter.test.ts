@@ -118,6 +118,94 @@ describe("tweet filtering parity", () => {
     }
   });
 
+  it("blocks explicitly confirmed spam handles case-insensitively", () => {
+    const item = tweet(
+      "BeatrizBoo28653",
+      "Beatriz Booth",
+      "havsa kapıkule #edirne #kırklareli anlamsız kelimeler",
+    );
+    const reasons = evaluateTweetFilter(config, "Kırklareli", item);
+
+    expect(reasons).toContain("blocked_handle:beatrizboo28653");
+    expect(shouldDropTweet(reasons)).toBe(true);
+  });
+
+  it("drops generated name handles only with the full short campaign pattern", () => {
+    const samples = [
+      tweet("GuzinKarad9jh", "Guzin Karadeniz", "haberi 😏 #kırklareli tekmil"),
+      tweet("MariaBurnsv9yj", "Maria Burns", "☹ gömüverme asitölçer #kırklareli"),
+      tweet("EdwardHalldv", "Edward Hall", "🤨 gravürcülük #kırklareli oyunluk"),
+      tweet("SophiaFreeyne", "Sophia Freeman", "#kırklareli 🙋 avuçlatmak ha"),
+      tweet("HulyaAksu69dv", "Hulya Aksu", "sertleşebilme 🤨 cüruf #kırklareli"),
+      tweet("JaniceGranok", "Janice Grant", "indinde ☹ lüleburgaz"),
+    ];
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(
+        { ...config, blockedTweetHandles: [] },
+        "Kırklareli",
+        item,
+      );
+      expect(reasons).toContain("block_pattern:generated_name_location_link_campaign");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("keeps normal name handles and natural location posts", () => {
+    const numericHandle = tweet(
+      "AhmetYilmaz1987",
+      "Ahmet Yilmaz",
+      "🙂 #kırklareli deprem oldu",
+    );
+    const naturalPost = tweet(
+      "AyseDemirxq",
+      "Ayse Demir",
+      "🙂 #kırklareli belediyenin konser programı bu akşam meydanda başlayacak",
+    );
+    const testConfig = { ...config, blockedTweetHandles: [] };
+
+    expect(shouldDropTweet(evaluateTweetFilter(testConfig, "Kırklareli", numericHandle))).toBe(false);
+    expect(shouldDropTweet(evaluateTweetFilter(testConfig, "Kırklareli", naturalPost))).toBe(false);
+  });
+
+  it("drops the repeated Trakya location word campaign", () => {
+    const samples = [
+      tweet(
+        "MauriceHer18287",
+        "Maurice Hernandez",
+        "havsa kapıkule cep görgülüce 💖 #kırklareli faresi #edirne izolatör",
+      ),
+      tweet(
+        "lula_chloe27018",
+        "Lula Chloe",
+        "#kırklareli #edirne havsa 🎀 kapıkule rastgele kelimeler",
+      ),
+      tweet(
+        "PhilippJacpjrf",
+        "Philipp Jacob",
+        "kapıkule havsa #edirne anlamsız ❤️ #kırklareli sözcükler",
+      ),
+    ];
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(
+        { ...config, blockedTweetHandles: [] },
+        "Kırklareli",
+        item,
+      );
+      expect(reasons).toContain("block_pattern:trakya_location_word_campaign");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("keeps a natural regional news post without a generated profile", () => {
+    const item = tweet(
+      "TrakyaHaber",
+      "Trakya Haber",
+      "Kırklareli, Edirne, Havsa ve Kapıkule güzergahında yoğunluk yaşanıyor 🚗",
+    );
+
+    expect(shouldDropTweet(evaluateTweetFilter(config, "Kırklareli", item))).toBe(false);
+  });
+
   it("keeps Alitek as a normal user", () => {
     const item = tweet("Alitek3959", "Ali Tek", "Lüleburgaz şu an yeri olan");
     item.text = "Lüleburgaz şu an yeri olan";

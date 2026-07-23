@@ -127,12 +127,21 @@ function reasonLabel(reasons) {
     "block_pattern:location_word_soup_link": "Otomatik konum kelime dizisi",
     "block_pattern:suspicious_location_link": "Şüpheli konum bağlantısı",
     "block_pattern:generated_location_link_campaign": "Otomatik oluşturulan kampanya",
+    "block_pattern:generated_name_location_link_campaign": "Üretilmiş ad hesabı kampanyası",
+    "block_pattern:trakya_location_word_campaign": "Toplu Trakya konum kampanyası",
     "block_pattern:luleburgaz_short_link_campaign": "Kısa reklam kalıbı",
     "block_pattern:luleburgaz_ad_profile": "Reklam profili kalıbı",
     "block_pattern:luleburgaz_location_dump": "Toplu konum listesi",
   };
   return (reasons || [])
-    .map((reason) => labels[reason] || (reason.startsWith("blocked_term:") ? `Engelli kelime: ${reason.split(":").slice(1).join(":")}` : reason))
+    .map((reason) =>
+      labels[reason] ||
+      (reason.startsWith("blocked_term:")
+        ? `Engelli kelime: ${reason.split(":").slice(1).join(":")}`
+        : reason.startsWith("blocked_handle:")
+          ? `Engelli hesap: @${reason.split(":").slice(1).join(":")}`
+          : reason)
+    )
     .join(" · ");
 }
 

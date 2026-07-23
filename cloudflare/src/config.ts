@@ -7,6 +7,28 @@ export const DEFAULT_BLOCKED_TWEET_TERMS = [
   "kırklareliesc",
 ];
 
+export const DEFAULT_BLOCKED_TWEET_HANDLES = [
+  "AddisonMorzsl",
+  "GuzinKarad9jh",
+  "dishugaharwar",
+  "MariaBurnsv9yj",
+  "EdwardHalldv",
+  "QuintinAyaj8dx",
+  "SophiaFreeyne",
+  "KatharinaBbn",
+  "SinanEmirofi",
+  "GracaFragohqc",
+  "CamdenHayegz6",
+  "HelenRamirt9ur",
+  "PolatAkyilwj",
+  "EslemKayhax9",
+  "AvelinaSoamma",
+  "HulyaAksu69dv",
+  "PatrickJenffpg",
+  "TolgaOzcel5sz",
+  "BeatrizBoo28653",
+];
+
 export const DEFAULT_WATCH_TWEET_TERMS = [
   "ücret elden",
   "ucret elden",
@@ -117,6 +139,10 @@ export function loadConfig(env: Env): AppConfig {
     tweetFilterMode:
       rawFilterMode === "off" || rawFilterMode === "log" ? rawFilterMode : "drop",
     blockedTweetTerms: parseList(env.BLOCKED_TWEET_TERMS, DEFAULT_BLOCKED_TWEET_TERMS),
+    blockedTweetHandles: parseList(
+      env.BLOCKED_TWEET_HANDLES,
+      DEFAULT_BLOCKED_TWEET_HANDLES,
+    ).map((handle) => handle.replace(/^@/, "").toLowerCase()),
     watchTweetTerms: parseList(env.WATCH_TWEET_TERMS, DEFAULT_WATCH_TWEET_TERMS),
     locationHashtagTerms: parseList(
       env.LOCATION_HASHTAG_TERMS,

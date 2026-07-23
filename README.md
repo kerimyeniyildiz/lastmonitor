@@ -79,6 +79,13 @@ TWEET_REQUIRED_PREFIXES=from:bpthaber=>SON DAKİKA
 
 `drop` modunda güvenli görülen spamler Telegram'a gönderilmez. Şu an `BLOCKED_TWEET_TERMS` eşleşmeleri, sadece lokasyon hashtag'i + link içeren paylaşımlar ve rakam ekli üretilmiş hesapların kısa lokasyon-link kampanyaları düşürülür. `WATCH_TWEET_TERMS` ve telefon numarası gibi diğer sinyaller logda kalır; yanlış pozitif riskini ölçmeden bunlara göre susturma yapılmaz. Geçici gözlem için `TWEET_FILTER_MODE=log`, tamamen kapatmak için `TWEET_FILTER_MODE=off` kullanılabilir. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
 
+Kesin spam olduğu doğrulanan hesaplar `BLOCKED_TWEET_HANDLES` ile kullanıcı adı bazında
+engellenebilir. Ayrıca ad-soyadla eşleşen fakat sonu rastgele harf/rakamlarla bozulan
+hesaplar; yalnızca kısa anlamsız metin, konum etiketi, emoji ve bağlantı sinyallerinin
+tamamı birlikteyse otomatik kampanya olarak düşürülür.
+Kırklareli, Edirne, Havsa ve Kapıkule adlarını birlikte kullanan eski kampanya da ancak
+üretilmiş profil, bağlantı ve emoji sinyalleri beraber olduğunda engellenir.
+
 `TWEET_REQUIRED_PREFIXES`, `sorgu=>zorunlu başlangıç` biçimindedir. Bu kural genel spam filtresinden bağımsızdır; örneğin `from:bpthaber` için yalnızca `SON DAKİKA` ile başlayan tweetler teslim edilir.
 
 Filtre nedenlerinde `blocked_term:*` ve `block_pattern:*` Telegram'a gönderilmeyen kesin kararları, `watch_term:*` ve `watch_pattern:phone_number` ise yalnızca ölçülen sinyalleri ifade eder.

@@ -89,7 +89,7 @@ export function dashboardPeriodStarts(now = new Date()): {
 function feedSource(view: string): string {
   const tweetEventAt = eventTimestampSql("tweet_created_at");
   const newsEventAt = eventTimestampSql("news_created_at");
-  const instagramEventAt = eventTimestampSql("content_created_at");
+  const instagramEventAt = eventTimestampSql("delivered_at");
   const tweets = (status: "sent" | "filtered") => `
     SELECT id AS item_id, 'tweet' AS kind, query, user_handle, user_name,
            text, link, NULL AS source, delivery_status, filter_reasons,

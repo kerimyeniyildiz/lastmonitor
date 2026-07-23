@@ -11,6 +11,7 @@ export interface Env {
   QUERY_SCHEDULE?: string;
   TWEET_FILTER_MODE?: string;
   BLOCKED_TWEET_TERMS?: string;
+  BLOCKED_TWEET_HANDLES?: string;
   WATCH_TWEET_TERMS?: string;
   LOCATION_HASHTAG_TERMS?: string;
   TWEET_FILTER_BYPASS_QUERIES?: string;
@@ -36,6 +37,7 @@ export interface AppConfig {
   querySchedule: QuerySchedule[];
   tweetFilterMode: "off" | "log" | "drop";
   blockedTweetTerms: string[];
+  blockedTweetHandles: string[];
   watchTweetTerms: string[];
   locationHashtagTerms: string[];
   tweetFilterBypassQueries: string[];
