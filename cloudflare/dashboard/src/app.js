@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   Bird,
+  Camera,
   CheckCircle2,
   Clock3,
   ExternalLink,
@@ -21,6 +22,7 @@ const icons = {
   Activity,
   BarChart3,
   Bird,
+  Camera,
   CheckCircle2,
   Clock3,
   ExternalLink,
@@ -137,15 +139,38 @@ function reasonLabel(reasons) {
 function feedItemMarkup(item) {
   const filtered = item.delivery_status === "filtered";
   const isNews = item.kind === "news";
-  const itemClass = filtered ? "filtered-item" : isNews ? "news-item" : "tweet-item";
-  const icon = filtered ? "shield-x" : isNews ? "newspaper" : "bird";
-  const identity = isNews ? item.source || "Haber kaynağı" : item.user_name || item.user_handle || "X kullanıcısı";
+  const isInstagram = item.kind === "instagram";
+  const itemClass = filtered
+    ? "filtered-item"
+    : isNews
+      ? "news-item"
+      : isInstagram
+        ? "instagram-item"
+        : "tweet-item";
+  const icon = filtered ? "shield-x" : isNews ? "newspaper" : isInstagram ? "camera" : "bird";
+  const identity = isNews
+    ? item.source || "Haber kaynağı"
+    : item.user_name || item.user_handle || (isInstagram ? "Instagram hesabı" : "X kullanıcısı");
+  const instagramLabels = {
+    post: "Gönderi",
+    carousel: "Çoklu gönderi",
+    reel: "Reels",
+    story: "Story",
+  };
   const subline = isNews
     ? "Haber"
-    : `${item.user_handle ? `@${item.user_handle}` : "X"}${item.query ? ` · ${item.query}` : ""}`;
-  const copy = isNews ? titleFromUrl(item.link) : item.text || "";
+    : isInstagram
+      ? `@${item.user_handle} · ${instagramLabels[item.content_type] || "Instagram"}`
+      : `${item.user_handle ? `@${item.user_handle}` : "X"}${item.query ? ` · ${item.query}` : ""}`;
+  const copy = isNews ? titleFromUrl(item.link) : item.text || (isInstagram ? "Yeni Instagram içeriği" : "");
   const longCopy = copy.length > 360;
-  const badge = filtered ? reasonLabel(item.filter_reasons) || "Filtrelendi" : isNews ? item.source : item.query;
+  const badge = filtered
+    ? reasonLabel(item.filter_reasons) || "Filtrelendi"
+    : isNews
+      ? item.source
+      : isInstagram
+        ? instagramLabels[item.content_type] || "Instagram"
+        : item.query;
   return `
     <article class="feed-item ${itemClass}" data-key="${escapeHtml(itemKey(item))}">
       <span class="feed-type-icon"><i data-lucide="${icon}"></i></span>
@@ -154,12 +179,13 @@ function feedItemMarkup(item) {
           <div class="feed-identity"><strong>${escapeHtml(identity)}</strong><span>${escapeHtml(subline)}</span></div>
           <time class="feed-time" datetime="${escapeHtml(item.display_at)}" title="${escapeHtml(formatDate(item.display_at, true))}">${escapeHtml(relativeTime(item.display_at))}</time>
         </div>
+        ${isInstagram && item.preview_url ? `<img class="instagram-preview" src="${escapeHtml(item.preview_url)}" alt="@${escapeHtml(item.user_handle)} Instagram önizlemesi" loading="lazy" />` : ""}
         <p class="feed-copy${longCopy ? " is-collapsed" : ""}">${escapeHtml(copy)}</p>
         ${longCopy ? '<button class="expand-button" type="button">Devamını göster</button>' : ""}
         <div class="feed-item-footer">
           <span class="source-badge${filtered ? " danger-badge" : ""}">${escapeHtml(badge || (isNews ? "Haber" : "Tweet"))}</span>
           <a class="external-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">
-            ${isNews ? "Haberi aç" : "X'te aç"}<i data-lucide="external-link"></i>
+            ${isNews ? "Haberi aç" : isInstagram ? "Instagram'da aç" : "X'te aç"}<i data-lucide="external-link"></i>
           </a>
         </div>
       </div>
@@ -170,7 +196,7 @@ function filteredItems() {
   const needle = state.search.trim().toLocaleLowerCase("tr-TR");
   if (!needle) return state.items;
   return state.items.filter((item) =>
-    [item.text, item.user_name, item.user_handle, item.query, item.source, item.link]
+    [item.text, item.user_name, item.user_handle, item.query, item.source, item.content_type, item.link]
       .join(" ")
       .toLocaleLowerCase("tr-TR")
       .includes(needle),
@@ -250,7 +276,7 @@ function completeBuckets(rows, count, type) {
     const key = type === "hour"
       ? `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:00`
       : `${parts.year}-${parts.month}-${parts.day}`;
-    buckets.push(byBucket.get(key) || { bucket: key, tweets: 0, news: 0 });
+    buckets.push(byBucket.get(key) || { bucket: key, tweets: 0, news: 0, instagram: 0 });
   }
   return buckets;
 }
@@ -258,17 +284,26 @@ function completeBuckets(rows, count, type) {
 function renderChart(element, rows, type) {
   const count = type === "hour" ? 24 : 14;
   const buckets = completeBuckets(rows, count, type);
-  const maximum = Math.max(1, ...buckets.map((row) => Number(row.tweets || 0) + Number(row.news || 0)));
+  const maximum = Math.max(
+    1,
+    ...buckets.map(
+      (row) => Number(row.tweets || 0) + Number(row.news || 0) + Number(row.instagram || 0),
+    ),
+  );
   element.innerHTML = buckets.map((row, index) => {
     const tweets = Number(row.tweets || 0);
     const news = Number(row.news || 0);
-    const totalHeight = ((tweets + news) / maximum) * 100;
-    const tweetHeight = tweets + news > 0 ? (tweets / (tweets + news)) * 100 : 0;
-    const newsHeight = 100 - tweetHeight;
+    const instagram = Number(row.instagram || 0);
+    const total = tweets + news + instagram;
+    const totalHeight = (total / maximum) * 100;
+    const tweetHeight = total > 0 ? (tweets / total) * 100 : 0;
+    const newsHeight = total > 0 ? (news / total) * 100 : 0;
+    const instagramHeight = total > 0 ? (instagram / total) * 100 : 0;
     const showLabel = type === "hour" ? index % 6 === 0 || index === count - 1 : index % 3 === 0 || index === count - 1;
     const label = type === "hour" ? row.bucket.slice(11, 13) : row.bucket.slice(5).replace("-", "/");
-    return `<div class="chart-column" title="${escapeHtml(label)} · ${tweets} tweet · ${news} haber">
-      <div class="chart-bars" style="height:${Math.max(totalHeight, tweets + news > 0 ? 3 : 1)}%">
+    return `<div class="chart-column" title="${escapeHtml(label)} · ${tweets} tweet · ${news} haber · ${instagram} Instagram">
+      <div class="chart-bars" style="height:${Math.max(totalHeight, total > 0 ? 3 : 1)}%">
+        <span class="instagram-bar" style="height:${instagramHeight}%"></span>
         <span class="news-bar" style="height:${newsHeight}%"></span>
         <span class="tweet-bar" style="height:${tweetHeight}%"></span>
       </div>

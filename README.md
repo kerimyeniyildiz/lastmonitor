@@ -95,22 +95,39 @@ SITEMAP_MONTH_LOOKBACK=1
 
 `SITEMAP_MONTHLY_TEMPLATES` içindeki `{YYYY}` ve `{MM}` alanları otomatik doldurulur. `SITEMAP_MONTH_LOOKBACK=1` ay başlarında önceki ayın sitemap'ini de kontrol eder. Eski uzaktan liste dosyası akışı gerekiyorsa `SITEMAP_LIST_URL` tanımlanabilir; doğrudan sitemap ayarları varsa öncelik onlardadır.
 
-Instagram takibi isteğe bağlıdır ve `instagrapi` ile ayrı bir Instagram oturumu kullanır. İlk çalıştırmada mevcut içerikler varsayılan olarak sadece işaretlenir, Telegram'a gönderilmez; bundan sonraki yeni story/gönderi/reels içerikleri bildirilir.
+## Yerel Instagram Worker
 
-```env
-INSTAGRAM_ENABLE=true
-INSTAGRAM_USERNAME=
-INSTAGRAM_PASSWORD=
-INSTAGRAM_TARGETS=rozmedyahaber|30m,kirklareli_gundem|30m
-INSTAGRAM_INTERVAL=30m
-INSTAGRAM_JITTER=5m
-INSTAGRAM_LIMIT=5
-INSTAGRAM_SESSION_FILE=instagram_session.json
-INSTAGRAM_SENT_FILE=sent_instagram.txt
-INSTAGRAM_SEND_EXISTING=false
+Yeni Instagram izleyicisi Cloudflare cron içinde çalışmaz. Instagram oturumu ve Android
+cihaz kimliği yalnızca Mac'te tutulur; normalize edilen yeni içerikler kimlik doğrulamalı
+Cloudflare ingest endpointine gönderilir. Cloudflare içeriği D1/R2'ye kaydeder, Telegram
+bildirimini gönderir ve dashboard akışına ekler.
+
+Bildirim medya kuralları:
+
+- Normal gönderi: görsel, açıklama ve bağlantı
+- Carousel: yalnızca ilk görsel, açıklama ve bağlantı
+- Reels: yalnızca kapak görseli, açıklama ve bağlantı
+- Fotoğraf veya video story: yalnızca kapak/önizleme ve bağlantı
+
+Kurulum:
+
+```bash
+/Users/seo/.local/bin/python3.11 -m venv .venv-instagram
+.venv-instagram/bin/pip install -r requirements-instagram.txt
+.venv-instagram/bin/python -m instagram_worker configure
+.venv-instagram/bin/python -m instagram_worker check-config
+.venv-instagram/bin/python -m instagram_worker login
+.venv-instagram/bin/python -m instagram_worker run-once
+.venv-instagram/bin/python -m instagram_worker install-launchd
 ```
 
-Instagram döngüsü her hedef için story, gönderi ve reels verisini tarihe göre sıralar. Telegram medya URL'yi doğrudan alamazsa dosyayı indirip yüklemeyi dener; video çok büyükse kapak görseli ve link gönderir. Instagram challenge, iki aşamalı doğrulama veya bekleme hatası isterse döngü kendini durdurur ve Telegram'a müdahale gerektiğini bildirir.
+Varsayılan güvenli yapılandırma dosyası
+`~/.config/lastmonitor-instagram/config.env`, çalışma verileri ise
+`~/.local/share/lastmonitor-instagram` altındadır. Her iki konum da Git dışında kalır.
+Instagram şifresi ve Cloudflare ingest anahtarı macOS Keychain'de saklanır; yapılandırma
+dosyasına yazılmaz.
+`launchd` servisi Mac prize bağlıyken sistem uykusunu engeller; ekranın uyumasına izin
+verir.
 
 ## API çalıştırma
 

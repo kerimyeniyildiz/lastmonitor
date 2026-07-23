@@ -16,6 +16,8 @@
   --amber-soft: #fff3dc;
   --red: #b83b3b;
   --red-soft: #faeaea;
+  --magenta: #b23373;
+  --magenta-soft: #f9e8f1;
 }
 
 * { box-sizing: border-box; }
@@ -165,6 +167,7 @@ h2, h3, p { letter-spacing: 0; }
 .feed-type-icon svg { width: 17px; height: 17px; }
 .tweet-item .feed-type-icon { color: var(--blue); background: var(--blue-soft); }
 .news-item .feed-type-icon { color: var(--amber); background: var(--amber-soft); }
+.instagram-item .feed-type-icon { color: var(--magenta); background: var(--magenta-soft); }
 .filtered-item .feed-type-icon { color: var(--red); background: var(--red-soft); }
 .feed-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .feed-identity { min-width: 0; }
@@ -172,6 +175,17 @@ h2, h3, p { letter-spacing: 0; }
 .feed-identity span, .feed-time { color: #79858c; font-size: 10px; }
 .feed-time { white-space: nowrap; }
 .feed-copy { margin: 8px 0 0; color: #2e3940; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.instagram-preview {
+  width: min(100%, 420px);
+  max-height: 340px;
+  margin-top: 10px;
+  display: block;
+  object-fit: contain;
+  object-position: left center;
+  background: #f1f3f4;
+  border: 1px solid #e0e4e6;
+  border-radius: 6px;
+}
 .feed-copy.is-collapsed { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
 .expand-button { margin-top: 6px; padding: 0; color: #176f66; background: none; border: 0; font-size: 10px; font-weight: 750; cursor: pointer; }
 .feed-item-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
@@ -217,10 +231,12 @@ h2, h3, p { letter-spacing: 0; }
 .metric-label svg { width: 15px; height: 15px; }
 .metric-row-tweet .metric-label svg { color: var(--blue); }
 .metric-row-news .metric-label svg { color: var(--amber); }
+.metric-row-instagram .metric-label svg { color: var(--magenta); }
 .period-values { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .period-values div { min-width: 0; padding-left: 9px; border-left: 2px solid #dce2e4; }
 .metric-row-tweet .period-values div { border-left-color: #aac9df; }
 .metric-row-news .period-values div { border-left-color: #e9ca94; }
+.metric-row-instagram .period-values div { border-left-color: #dfa9c4; }
 .period-values span { display: block; overflow: hidden; color: #7b878e; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .period-values strong { display: block; margin-top: 3px; color: #172027; font-size: 20px; font-variant-numeric: tabular-nums; }
 
@@ -245,6 +261,7 @@ h2, h3, p { letter-spacing: 0; }
 .chart-legend span::before { content: ""; width: 7px; height: 7px; border-radius: 2px; }
 .tweet-legend::before { background: var(--blue); }
 .news-legend::before { background: #d49938; }
+.instagram-legend::before { background: var(--magenta); }
 .chart-block { margin-top: 15px; }
 .compact-chart-block { margin-top: 18px; }
 .chart-caption { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -255,6 +272,7 @@ h2, h3, p { letter-spacing: 0; }
 .chart-bars { min-height: 2px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 2px 2px 0 0; overflow: hidden; }
 .tweet-bar { background: var(--blue); }
 .news-bar { background: #d49938; }
+.instagram-bar { background: var(--magenta); }
 .chart-label { position: absolute; top: calc(100% + 5px); left: 50%; transform: translateX(-50%); color: #889299; font-size: 8px; white-space: nowrap; }
 .daily-chart { height: 76px; margin-bottom: 13px; gap: 5px; }
 

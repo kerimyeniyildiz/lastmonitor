@@ -1,9 +1,11 @@
 export interface Env {
   DB: D1Database;
+  INSTAGRAM_MEDIA: R2Bucket;
   RAPIDAPI_KEY: string;
   TELEGRAM_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
   API_TOKEN?: string;
+  INSTAGRAM_INGEST_TOKEN?: string;
   DELIVERY_MODE?: string;
   QUERY_TYPE?: string;
   TWEET_LIMIT?: string;
@@ -65,7 +67,7 @@ export interface NewsEntry {
 }
 
 export interface RunSummary {
-  kind: "tweets" | "news";
+  kind: "tweets" | "news" | "instagram";
   target: string;
   status: "ok" | "error" | "skipped";
   fetchedCount: number;

@@ -89,9 +89,11 @@ export function dashboardPeriodStarts(now = new Date()): {
 function feedSource(view: string): string {
   const tweetEventAt = eventTimestampSql("tweet_created_at");
   const newsEventAt = eventTimestampSql("news_created_at");
+  const instagramEventAt = eventTimestampSql("content_created_at");
   const tweets = (status: "sent" | "filtered") => `
     SELECT id AS item_id, 'tweet' AS kind, query, user_handle, user_name,
            text, link, NULL AS source, delivery_status, filter_reasons,
+           NULL AS preview_url, NULL AS content_type,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${tweetEventAt}) AS display_at
     FROM tweets
     WHERE delivery_status = '${status}'`;
@@ -99,18 +101,31 @@ function feedSource(view: string): string {
     SELECT id AS item_id, 'news' AS kind, NULL AS query, NULL AS user_handle,
            NULL AS user_name, NULL AS text, link, source, delivery_status,
            '[]' AS filter_reasons,
+           NULL AS preview_url, NULL AS content_type,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${newsEventAt}) AS display_at
     FROM news
     WHERE delivery_status = 'sent'`;
+  const instagram = `
+    SELECT id AS item_id, 'instagram' AS kind, NULL AS query,
+           username AS user_handle, username AS user_name, caption AS text,
+           link, 'Instagram' AS source, delivery_status, '[]' AS filter_reasons,
+           CASE WHEN preview_key IS NOT NULL
+                THEN '/api/instagram/media/' || event_key
+                ELSE NULL END AS preview_url,
+           content_type,
+           strftime('%Y-%m-%dT%H:%M:%fZ', ${instagramEventAt}) AS display_at
+    FROM instagram_events
+    WHERE delivery_status = 'sent'`;
   if (view === "tweets") return tweets("sent");
   if (view === "news") return news;
+  if (view === "instagram") return instagram;
   if (view === "filtered") return tweets("filtered");
-  return `${tweets("sent")} UNION ALL ${news}`;
+  return `${tweets("sent")} UNION ALL ${news} UNION ALL ${instagram}`;
 }
 
 export async function dashboardFeed(requestUrl: URL, env: Env): Promise<Response> {
   const requestedView = requestUrl.searchParams.get("view") || "all";
-  const view = ["all", "tweets", "news", "filtered"].includes(requestedView)
+  const view = ["all", "tweets", "news", "instagram", "filtered"].includes(requestedView)
     ? requestedView
     : "all";
   const limit = parseLimit(requestUrl.searchParams.get("limit"));
@@ -155,8 +170,13 @@ export async function dashboardFeed(requestUrl: URL, env: Env): Promise<Response
   return json({ items, next_cursor: nextCursor });
 }
 
-function periodCountSql(table: "tweets" | "news", status: string): string {
-  const createdColumn = table === "tweets" ? "tweet_created_at" : "news_created_at";
+function periodCountSql(table: "tweets" | "news" | "instagram_events", status: string): string {
+  const createdColumn =
+    table === "tweets"
+      ? "tweet_created_at"
+      : table === "news"
+        ? "news_created_at"
+        : "content_created_at";
   return `
     WITH records AS (
       SELECT ${eventTimestampSql(createdColumn)} AS event_at
@@ -171,6 +191,15 @@ function periodCountSql(table: "tweets" | "news", status: string): string {
     FROM records`;
 }
 
+function periodCounts(row: Record<string, unknown> | undefined): Record<string, number> {
+  return {
+    today: Number(row?.today || 0),
+    week: Number(row?.week || 0),
+    month: Number(row?.month || 0),
+    year: Number(row?.year || 0),
+  };
+}
+
 export async function dashboardStats(env: Env, now = new Date()): Promise<Response> {
   const starts = dashboardPeriodStarts(now);
   const periodBindings = [starts.today, starts.week, starts.month, starts.year];
@@ -182,10 +211,21 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
     .toISOString()
     .slice(0, 19)
     .replace("T", " ");
-  const [tweetCounts, newsCounts, spamCounts, topAccounts, hourly, daily, lastSuccess, lastError] =
+  const [
+    tweetCounts,
+    newsCounts,
+    instagramCounts,
+    spamCounts,
+    topAccounts,
+    hourly,
+    daily,
+    lastSuccess,
+    lastError,
+  ] =
     await env.DB.batch([
       env.DB.prepare(periodCountSql("tweets", "sent")).bind(...periodBindings),
       env.DB.prepare(periodCountSql("news", "sent")).bind(...periodBindings),
+      env.DB.prepare(periodCountSql("instagram_events", "sent")).bind(...periodBindings),
       env.DB.prepare(
         `WITH records AS (
            SELECT delivery_status, filter_reasons,
@@ -219,10 +259,14 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
            UNION ALL
            SELECT 'news' AS kind, ${eventTimestampSql("news_created_at")} AS event_at
            FROM news WHERE delivery_status = 'sent'
+           UNION ALL
+           SELECT 'instagram' AS kind, ${eventTimestampSql("content_created_at")} AS event_at
+           FROM instagram_events WHERE delivery_status = 'sent'
          )
          SELECT strftime('%Y-%m-%d %H:00', event_at, '+3 hours') AS bucket,
                 SUM(CASE WHEN kind = 'tweet' THEN 1 ELSE 0 END) AS tweets,
-                SUM(CASE WHEN kind = 'news' THEN 1 ELSE 0 END) AS news
+                SUM(CASE WHEN kind = 'news' THEN 1 ELSE 0 END) AS news,
+                SUM(CASE WHEN kind = 'instagram' THEN 1 ELSE 0 END) AS instagram
          FROM activity
          WHERE event_at >= ?
          GROUP BY bucket
@@ -235,10 +279,14 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
            UNION ALL
            SELECT 'news' AS kind, ${eventTimestampSql("news_created_at")} AS event_at
            FROM news WHERE delivery_status = 'sent'
+           UNION ALL
+           SELECT 'instagram' AS kind, ${eventTimestampSql("content_created_at")} AS event_at
+           FROM instagram_events WHERE delivery_status = 'sent'
          )
          SELECT date(event_at, '+3 hours') AS bucket,
                 SUM(CASE WHEN kind = 'tweet' THEN 1 ELSE 0 END) AS tweets,
-                SUM(CASE WHEN kind = 'news' THEN 1 ELSE 0 END) AS news
+                SUM(CASE WHEN kind = 'news' THEN 1 ELSE 0 END) AS news,
+                SUM(CASE WHEN kind = 'instagram' THEN 1 ELSE 0 END) AS instagram
          FROM activity
          WHERE event_at >= ?
          GROUP BY bucket
@@ -261,8 +309,11 @@ export async function dashboardStats(env: Env, now = new Date()): Promise<Respon
   const totalToday = Number(spam.total_today || 0);
   return json({
     generated_at: now.toISOString(),
-    tweets: tweetCounts.results[0] || {},
-    news: newsCounts.results[0] || {},
+    tweets: periodCounts(tweetCounts.results[0] as Record<string, unknown> | undefined),
+    news: periodCounts(newsCounts.results[0] as Record<string, unknown> | undefined),
+    instagram: periodCounts(
+      instagramCounts.results[0] as Record<string, unknown> | undefined,
+    ),
     spam: {
       today: spamToday,
       week: Number(spam.week || 0),

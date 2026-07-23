@@ -1,5 +1,6 @@
 import { parseBoolean } from "./config";
 import { dashboardFeed, dashboardStats } from "./dashboard";
+import { ingestInstagramEvent, ingestInstagramRun, serveInstagramMedia } from "./instagram";
 import type { AppConfig, Env } from "./types";
 import { runDueMonitors, sendTelegram } from "./monitor";
 
@@ -155,6 +156,15 @@ export async function handleRequest(
   }
   if (request.method === "GET" && url.pathname === "/api/dashboard/stats") {
     return dashboardStats(env);
+  }
+  if (request.method === "GET" && url.pathname.startsWith("/api/instagram/media/")) {
+    return serveInstagramMedia(url, env);
+  }
+  if (request.method === "POST" && url.pathname === "/api/instagram/events") {
+    return ingestInstagramEvent(request, env);
+  }
+  if (request.method === "POST" && url.pathname === "/api/instagram/runs") {
+    return ingestInstagramRun(request, env);
   }
   if (!isAuthorized(request, env)) return json({ detail: "Unauthorized" }, 401);
   if (request.method === "GET" && url.pathname === "/status") return status(env, config);

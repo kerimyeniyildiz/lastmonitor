@@ -50,6 +50,7 @@
               <button class="segment is-active" data-view="all" role="tab">Tümü</button>
               <button class="segment" data-view="tweets" role="tab">Tweetler</button>
               <button class="segment" data-view="news" role="tab">Haberler</button>
+              <button class="segment" data-view="instagram" role="tab">Instagram</button>
               <button class="segment" data-view="filtered" role="tab">Engellenenler</button>
             </div>
             <label class="search-control">
@@ -102,6 +103,15 @@
                 <div><span>Bu yıl</span><strong data-stat="news.year">–</strong></div>
               </div>
             </div>
+            <div class="metric-row metric-row-instagram">
+              <div class="metric-label"><i data-lucide="camera"></i><span>Instagram içeriği</span></div>
+              <div class="period-values">
+                <div><span>Bugün</span><strong data-stat="instagram.today">–</strong></div>
+                <div><span>Bu hafta</span><strong data-stat="instagram.week">–</strong></div>
+                <div><span>Bu ay</span><strong data-stat="instagram.month">–</strong></div>
+                <div><span>Bu yıl</span><strong data-stat="instagram.year">–</strong></div>
+              </div>
+            </div>
           </section>
 
           <section class="spam-summary" aria-labelledby="spamTitle">
@@ -124,9 +134,9 @@
             <div class="stat-section-title split-title">
               <div class="title-with-icon">
                 <span class="section-icon"><i data-lucide="bar-chart-3"></i></span>
-                <div><h3 id="activityTitle">Aktivite</h3><p>Tweet ve haber yoğunluğu</p></div>
+                <div><h3 id="activityTitle">Aktivite</h3><p>Tweet, haber ve Instagram yoğunluğu</p></div>
               </div>
-              <div class="chart-legend"><span class="tweet-legend">Tweet</span><span class="news-legend">Haber</span></div>
+              <div class="chart-legend"><span class="tweet-legend">Tweet</span><span class="news-legend">Haber</span><span class="instagram-legend">Instagram</span></div>
             </div>
             <div class="chart-block">
               <div class="chart-caption"><strong>Son 24 saat</strong><span>Saatlik</span></div>
