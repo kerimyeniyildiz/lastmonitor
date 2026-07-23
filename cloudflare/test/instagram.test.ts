@@ -9,6 +9,7 @@ const payload = {
   caption: "Yeni haber",
   link: "https://www.instagram.com/reel/ABC123/",
   created_at: "2026-07-23T12:00:00+00:00",
+  preview_url: "https://scontent.cdninstagram.com/cover.jpg",
 };
 
 describe("Instagram ingest helpers", () => {
@@ -20,6 +21,12 @@ describe("Instagram ingest helpers", () => {
     expect(() =>
       validateInstagramPayload({ ...payload, link: "https://example.com/ABC123" }),
     ).toThrow("instagram.com");
+  });
+
+  it("rejects preview URLs outside Instagram CDNs", () => {
+    expect(() =>
+      validateInstagramPayload({ ...payload, preview_url: "https://example.com/cover.jpg" }),
+    ).toThrow("Instagram CDN");
   });
 
   it("builds compact reel notifications without video data", () => {

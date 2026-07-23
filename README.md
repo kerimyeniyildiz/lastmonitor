@@ -99,8 +99,10 @@ SITEMAP_MONTH_LOOKBACK=1
 
 Yeni Instagram izleyicisi Cloudflare cron içinde çalışmaz. Instagram oturumu ve Android
 cihaz kimliği yalnızca Mac'te tutulur; normalize edilen yeni içerikler kimlik doğrulamalı
-Cloudflare ingest endpointine gönderilir. Cloudflare içeriği D1/R2'ye kaydeder, Telegram
-bildirimini gönderir ve dashboard akışına ekler.
+Cloudflare ingest endpointine gönderilir. Cloudflare metaveriyi D1'e kaydeder, Instagram
+CDN önizleme bağlantısını doğrudan kullanır, Telegram bildirimini gönderir ve dashboard
+akışına ekler. Görseller indirilmez veya R2'ye kopyalanmaz; CDN bağlantısı süresi dolduğunda
+eski dashboard önizlemesi artık açılmayabilir.
 
 Bildirim medya kuralları:
 

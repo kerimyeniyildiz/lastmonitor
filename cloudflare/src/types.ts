@@ -1,6 +1,5 @@
 export interface Env {
   DB: D1Database;
-  INSTAGRAM_MEDIA: R2Bucket;
   RAPIDAPI_KEY: string;
   TELEGRAM_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;

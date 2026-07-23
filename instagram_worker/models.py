@@ -27,6 +27,7 @@ class InstagramEvent:
             "caption": self.caption,
             "link": self.link,
             "created_at": self.created_at,
+            "preview_url": self.preview_url,
         }
 
 

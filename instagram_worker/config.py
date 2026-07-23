@@ -30,7 +30,6 @@ class Config:
     runtime_dir: Path
     session_file: Path
     database_file: Path
-    media_dir: Path
     log_file: Path
     config_file: Path
 
@@ -207,7 +206,6 @@ def load_config(path: Path | None = None, require_secrets: bool = True) -> Confi
         runtime_dir=runtime_dir,
         session_file=runtime_dir / "session.json",
         database_file=runtime_dir / "state.db",
-        media_dir=runtime_dir / "media",
         log_file=runtime_dir / "worker.log",
         config_file=config_path,
     )

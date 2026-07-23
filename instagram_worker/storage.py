@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-import time
 from pathlib import Path
 
 from .models import InstagramEvent
@@ -36,7 +35,6 @@ CREATE TABLE IF NOT EXISTS items (
     created_at TEXT,
     sort_timestamp REAL NOT NULL DEFAULT 0,
     preview_url TEXT,
-    preview_path TEXT,
     delivery_status TEXT NOT NULL,
     attempts INTEGER NOT NULL DEFAULT 0,
     next_attempt_at REAL NOT NULL DEFAULT 0,
@@ -183,13 +181,6 @@ class Storage:
             (now, limit),
         ).fetchall()
 
-    def set_preview_path(self, event_key: str, preview_path: str | None) -> None:
-        self.connection.execute(
-            "UPDATE items SET preview_path = ? WHERE event_key = ?",
-            (preview_path, event_key),
-        )
-        self.connection.commit()
-
     def mark_delivered(self, event_key: str) -> None:
         self.connection.execute(
             """UPDATE items
@@ -215,21 +206,3 @@ class Storage:
             "SELECT COUNT(*) AS total FROM items WHERE delivery_status IN ('pending', 'send_failed')"
         ).fetchone()
         return int(row["total"] if row else 0)
-
-    def prune_delivered(self, older_than_days: int = 45) -> None:
-        cutoff = time.time() - older_than_days * 86400
-        rows = self.connection.execute(
-            """SELECT event_key, preview_path FROM items
-             WHERE delivery_status = 'sent'
-               AND delivered_at < datetime(?, 'unixepoch')""",
-            (cutoff,),
-        ).fetchall()
-        with self.connection:
-            for row in rows:
-                path = Path(str(row["preview_path"])) if row["preview_path"] else None
-                if path:
-                    path.unlink(missing_ok=True)
-                self.connection.execute(
-                    "UPDATE items SET preview_path = NULL WHERE event_key = ?",
-                    (row["event_key"],),
-                )

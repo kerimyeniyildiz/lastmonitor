@@ -6,14 +6,12 @@ import signal
 import threading
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
 import requests
 
 from .client import build_client
 from .config import Config, Target
 from .delivery import CloudflareDelivery
-from .media import prepare_preview
 from .models import normalize_items
 from .storage import Storage
 
@@ -153,20 +151,7 @@ class InstagramService:
         delivered = 0
         for row in self.storage.due_items(time.time()):
             event_key = str(row["event_key"])
-            preview_path = (
-                Path(str(row["preview_path"])) if row["preview_path"] else None
-            )
             try:
-                if preview_path is None or not preview_path.exists():
-                    preview_path = prepare_preview(
-                        event_key,
-                        str(row["preview_url"]) if row["preview_url"] else None,
-                        self.config.media_dir,
-                    )
-                    self.storage.set_preview_path(
-                        event_key,
-                        str(preview_path) if preview_path else None,
-                    )
                 self.delivery.send_event(
                     {
                         "event_key": event_key,
@@ -178,8 +163,10 @@ class InstagramService:
                         "created_at": str(row["created_at"])
                         if row["created_at"]
                         else None,
+                        "preview_url": str(row["preview_url"])
+                        if row["preview_url"]
+                        else None,
                     },
-                    preview_path,
                 )
                 self.storage.mark_delivered(event_key)
                 delivered += 1
@@ -212,7 +199,6 @@ class InstagramService:
                     "Instagram target check failed username=%s", target.username
                 )
             self.deliver_due()
-        self.storage.prune_delivered()
 
     def run_forever(self) -> None:
         signal.signal(signal.SIGTERM, self.stop)

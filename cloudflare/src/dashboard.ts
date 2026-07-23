@@ -109,9 +109,7 @@ function feedSource(view: string): string {
     SELECT id AS item_id, 'instagram' AS kind, NULL AS query,
            username AS user_handle, username AS user_name, caption AS text,
            link, 'Instagram' AS source, delivery_status, '[]' AS filter_reasons,
-           CASE WHEN preview_key IS NOT NULL
-                THEN '/api/instagram/media/' || event_key
-                ELSE NULL END AS preview_url,
+           preview_url,
            content_type,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${instagramEventAt}) AS display_at
     FROM instagram_events

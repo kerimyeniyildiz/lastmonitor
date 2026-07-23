@@ -41,12 +41,6 @@
       "migrations_dir": "migrations"
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "INSTAGRAM_MEDIA",
-      "bucket_name": "lastmonitor-instagram-media"
-    }
-  ],
   "vars": {
     "DELIVERY_MODE": "live",
     "QUERY_TYPE": "Latest",
