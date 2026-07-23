@@ -194,10 +194,10 @@ def load_config(path: Path | None = None, require_secrets: bool = True) -> Confi
         username=username,
         password=password,
         targets=_parse_targets(
-            values.get("IG_TARGETS", "rozmedyahaber|1800,kirklareli_gundem|1800")
+            values.get("IG_TARGETS", "rozmedyahaber|1950,kirklareli_gundem|1950")
         ),
         interval_jitter_seconds=_read_int(
-            values, "IG_INTERVAL_JITTER_SECONDS", 300, 0, 900
+            values, "IG_INTERVAL_JITTER_SECONDS", 1050, 0, 1800
         ),
         fetch_limit=_read_int(values, "IG_FETCH_LIMIT", 12, 5, 30),
         send_existing=_read_bool(values.get("IG_SEND_EXISTING"), False),

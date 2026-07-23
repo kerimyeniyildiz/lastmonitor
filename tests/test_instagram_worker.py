@@ -5,8 +5,10 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from instagram_worker.models import normalize_item
+from instagram_worker.service import InstagramService
 from instagram_worker.storage import Storage
 
 
@@ -113,6 +115,18 @@ class InstagramStorageTests(unittest.TestCase):
                 (1, 0),
             )
             storage.close()
+
+
+class InstagramScheduleTests(unittest.TestCase):
+    def test_random_interval_stays_between_fifteen_and_fifty_minutes(self) -> None:
+        service = object.__new__(InstagramService)
+        service.config = SimpleNamespace(interval_jitter_seconds=1050)
+        target = SimpleNamespace(interval_seconds=1950)
+
+        with patch("instagram_worker.service.random.randint", return_value=-1050):
+            self.assertEqual(service._next_interval(target), 900)
+        with patch("instagram_worker.service.random.randint", return_value=1050):
+            self.assertEqual(service._next_interval(target), 3000)
 
 
 if __name__ == "__main__":

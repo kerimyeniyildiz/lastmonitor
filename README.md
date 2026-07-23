@@ -138,13 +138,14 @@ dosyasına yazılmaz.
 `launchd` servisi Mac prize bağlıyken sistem uykusunu engeller; ekranın uyumasına izin
 verir.
 
-Çalışma durumunu görmek, logu izlemek, durdurmak ve yeniden başlatmak için:
+Worker otomatik başlamaz ve hata sonrasında kendiliğinden yeniden açılmaz. Çalışma
+durumunu görmek, başlatmak, durdurmak ve logu izlemek için:
 
 ```bash
-launchctl print gui/$(id -u)/com.kerimyeniyildiz.lastmonitor-instagram
+.venv-instagram/bin/python -m instagram_worker status
+.venv-instagram/bin/python -m instagram_worker start
+.venv-instagram/bin/python -m instagram_worker stop
 tail -f ~/.local/share/lastmonitor-instagram/worker.log
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.kerimyeniyildiz.lastmonitor-instagram.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kerimyeniyildiz.lastmonitor-instagram.plist
 ```
 
 Worker aynı süreç içinde tek Instagram istemcisi kullanır. Yeniden başlatıldığında
@@ -153,6 +154,10 @@ olduğu sürece yeni parola girişi yapılmaz. `state.db` görülen içerik kiml
 başlangıçlarını korur. `IG_SEND_EXISTING=false` olduğu için yeni eklenen hedefin ilk
 taraması sessizce başlangıç noktası oluşturur; normal yeniden başlatmalarda daha önce
 görülen içerikler yeniden gönderilmez.
+
+İki hedef de her başarılı kontrolden sonra bağımsız olarak 15–50 dakika arasında
+rastgele bir sonraki kontrol zamanı seçer. Bu aralık ortalama istek sayısını sabit yarım
+saatlik düzene yakın tutarken kontrollerin düzenli aralıklarla tekrarlanmasını önler.
 
 ## API çalıştırma
 

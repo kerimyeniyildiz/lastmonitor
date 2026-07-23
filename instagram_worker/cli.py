@@ -6,6 +6,7 @@ import logging
 import logging.handlers
 import os
 import plistlib
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,8 @@ from .config import (
     load_config,
 )
 from .service import InstagramService
+
+LAUNCHD_LABEL = "com.kerimyeniyildiz.lastmonitor-instagram"
 
 
 def configure_logging(config: Config) -> None:
@@ -50,7 +53,7 @@ def configure(path: Path) -> None:
     password = getpass.getpass("Instagram şifresi: ")
     targets = _prompt(
         "Hedefler (hesap|saniye,...)",
-        "rozmedyahaber|1800,kirklareli_gundem|1800",
+        "rozmedyahaber|1950,kirklareli_gundem|1950",
     )
     endpoint = _prompt(
         "Cloudflare ingest adresi",
@@ -72,7 +75,7 @@ def configure(path: Path) -> None:
         (
             f"IG_USERNAME={username}",
             f"IG_TARGETS={targets}",
-            "IG_INTERVAL_JITTER_SECONDS=300",
+            "IG_INTERVAL_JITTER_SECONDS=1050",
             "IG_FETCH_LIMIT=12",
             "IG_SEND_EXISTING=false",
             f"CF_INGEST_URL={endpoint}",
@@ -88,13 +91,12 @@ def configure(path: Path) -> None:
 
 
 def install_launchd(config: Config) -> Path:
-    label = "com.kerimyeniyildiz.lastmonitor-instagram"
-    plist_path = Path("~/Library/LaunchAgents").expanduser() / f"{label}.plist"
+    plist_path = Path("~/Library/LaunchAgents").expanduser() / f"{LAUNCHD_LABEL}.plist"
     project_root = Path(__file__).resolve().parents[1]
     config.runtime_dir.mkdir(parents=True, exist_ok=True)
     plist_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "Label": label,
+        "Label": LAUNCHD_LABEL,
         "ProgramArguments": [
             "/usr/bin/caffeinate",
             "-s",
@@ -106,8 +108,7 @@ def install_launchd(config: Config) -> Path:
             "run",
         ],
         "WorkingDirectory": str(project_root),
-        "RunAtLoad": True,
-        "KeepAlive": {"SuccessfulExit": False},
+        "RunAtLoad": False,
         "ProcessType": "Background",
         "ThrottleInterval": 30,
         "StandardOutPath": str(config.runtime_dir / "launchd.out.log"),
@@ -130,6 +131,74 @@ def install_launchd(config: Config) -> Path:
     return plist_path
 
 
+def launchd_plist_path() -> Path:
+    return Path("~/Library/LaunchAgents").expanduser() / f"{LAUNCHD_LABEL}.plist"
+
+
+def launchd_domain() -> str:
+    return f"gui/{os.getuid()}"
+
+
+def launchd_target() -> str:
+    return f"{launchd_domain()}/{LAUNCHD_LABEL}"
+
+
+def launchd_state() -> tuple[str, str, bool]:
+    result = subprocess.run(
+        ["launchctl", "print", launchd_target()],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return "stopped", "", False
+    state_match = re.search(r"^\s*state = (.+?)\s*$", result.stdout, re.MULTILINE)
+    pid_match = re.search(r"^\s*pid = (\d+)", result.stdout, re.MULTILINE)
+    state = state_match.group(1) if state_match else "loaded"
+    if state == "not running":
+        state = "stopped"
+    return (
+        state,
+        pid_match.group(1) if pid_match else "",
+        True,
+    )
+
+
+def start_launchd() -> None:
+    state, pid, loaded = launchd_state()
+    if state == "running":
+        print(f"Instagram worker already running (pid={pid})")
+        return
+    plist_path = launchd_plist_path()
+    if not plist_path.exists():
+        raise FileNotFoundError("LaunchAgent is not installed; run install-launchd first")
+    if not loaded:
+        subprocess.run(
+            ["launchctl", "bootstrap", launchd_domain(), str(plist_path)],
+            check=True,
+        )
+    subprocess.run(["launchctl", "kickstart", launchd_target()], check=True)
+    print("Instagram worker started")
+
+
+def stop_launchd() -> None:
+    _state, _pid, loaded = launchd_state()
+    if not loaded:
+        print("Instagram worker already stopped")
+        return
+    subprocess.run(
+        ["launchctl", "bootout", launchd_domain(), str(launchd_plist_path())],
+        check=True,
+    )
+    print("Instagram worker stopped")
+
+
+def print_launchd_status() -> None:
+    state, pid, _loaded = launchd_state()
+    suffix = f" (pid={pid})" if pid else ""
+    print(f"Instagram worker: {state}{suffix}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Lastmonitor local Instagram worker")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG_PATH)
@@ -140,6 +209,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("run-once")
     subparsers.add_parser("run")
     subparsers.add_parser("install-launchd")
+    subparsers.add_parser("start")
+    subparsers.add_parser("stop")
+    subparsers.add_parser("status")
     return parser
 
 
@@ -166,6 +238,15 @@ def main(argv: list[str] | None = None) -> int:
             raise RuntimeError("Run the login command before installing launchd")
         path = install_launchd(config)
         print(f"LaunchAgent installed: {path}")
+        return 0
+    if args.command == "start":
+        start_launchd()
+        return 0
+    if args.command == "stop":
+        stop_launchd()
+        return 0
+    if args.command == "status":
+        print_launchd_status()
         return 0
 
     service = InstagramService(config)
