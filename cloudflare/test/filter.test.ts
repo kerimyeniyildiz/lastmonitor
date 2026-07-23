@@ -76,6 +76,33 @@ describe("tweet filtering parity", () => {
     expect(shouldDropTweet(reasons)).toBe(true);
   });
 
+  it("drops dense Trakya location ads regardless of the search query", () => {
+    const item = tweet(
+      "naik_ravinaik",
+      "ÜNİVERSİTELİ KIZLAR",
+      "Sevgi varsa yol bulunur 🛤️📷 edirne,kırklareli,kapaklı,tekirdağ,lüleburgaz,şarkköy,malkara,hayrabolu,saray,ergene,muratlı,marmaraereğlisi,bayan,",
+    );
+
+    const reasons = evaluateTweetFilter(
+      { ...config, blockedTweetHandles: [] },
+      "Kırklareli",
+      item,
+    );
+
+    expect(reasons).toContain("block_pattern:trakya_location_dump_ad_campaign");
+    expect(shouldDropTweet(reasons)).toBe(true);
+  });
+
+  it("keeps natural multi-location regional reports", () => {
+    const item = tweet(
+      "TrakyaHaber",
+      "Trakya Haber",
+      "Edirne, Kırklareli, Kapaklı, Tekirdağ, Lüleburgaz, Şarkköy, Malkara ve Saray hattında kuvvetli yağış bekleniyor 🌧️",
+    );
+
+    expect(shouldDropTweet(evaluateTweetFilter(config, "Kırklareli", item))).toBe(false);
+  });
+
   it("keeps ordinary Luleburgaz tweets that use the word bayan", () => {
     const item = tweet(
       "yerelhaber",

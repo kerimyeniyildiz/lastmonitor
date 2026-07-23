@@ -90,7 +90,7 @@ Kırklareli, Edirne, Havsa ve Kapıkule adlarını birlikte kullanan eski kampan
 
 Filtre nedenlerinde `blocked_term:*` ve `block_pattern:*` Telegram'a gönderilmeyen kesin kararları, `watch_term:*` ve `watch_pattern:phone_number` ise yalnızca ölçülen sinyalleri ifade eder.
 
-Lüleburgaz sorgusunda gözlenen otomatik reklam kampanyası ayrıca birleşik sinyallerle süzülür. Yalnızca uzun rakam dizili kullanıcı adı, konum, link, tek kelimelik görünen ad ve en fazla üç artık kelime birlikteyse kısa kalıp düşürülür. Aynı kapsamda reklam ifadeli profil adları ve virgülle oluşturulmuş uzun konum listeleri de engellenir; bu kurallar diğer sorgulara uygulanmaz.
+Lüleburgaz sorgusunda gözlenen otomatik reklam kampanyası ayrıca birleşik sinyallerle süzülür. Yalnızca uzun rakam dizili kullanıcı adı, konum, link, tek kelimelik görünen ad ve en fazla üç artık kelime birlikteyse kısa kalıp düşürülür. Reklam ifadeli profil adları da bu sorguda değerlendirilir. En az sekiz Trakya konumunu virgülle sıralayan, reklam profili kelimesi, emoji ve bağlantı taşıyan yoğun konum listeleri ise kampanyanın başka sorgulardan kaçmaması için sorgudan bağımsız engellenir.
 
 Haber kaynakları varsayılan olarak iki sitemap kullanır:
 
@@ -137,6 +137,22 @@ Instagram şifresi ve Cloudflare ingest anahtarı macOS Keychain'de saklanır; y
 dosyasına yazılmaz.
 `launchd` servisi Mac prize bağlıyken sistem uykusunu engeller; ekranın uyumasına izin
 verir.
+
+Çalışma durumunu görmek, logu izlemek, durdurmak ve yeniden başlatmak için:
+
+```bash
+launchctl print gui/$(id -u)/com.kerimyeniyildiz.lastmonitor-instagram
+tail -f ~/.local/share/lastmonitor-instagram/worker.log
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.kerimyeniyildiz.lastmonitor-instagram.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kerimyeniyildiz.lastmonitor-instagram.plist
+```
+
+Worker aynı süreç içinde tek Instagram istemcisi kullanır. Yeniden başlatıldığında
+`session.json` içindeki cihaz kimliği, çerezler ve oturum ayarları yüklenir; oturum geçerli
+olduğu sürece yeni parola girişi yapılmaz. `state.db` görülen içerik kimliklerini ve hedef
+başlangıçlarını korur. `IG_SEND_EXISTING=false` olduğu için yeni eklenen hedefin ilk
+taraması sessizce başlangıç noktası oluşturur; normal yeniden başlatmalarda daha önce
+görülen içerikler yeniden gönderilmez.
 
 ## API çalıştırma
 

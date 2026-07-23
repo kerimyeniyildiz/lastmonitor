@@ -129,6 +129,7 @@ function reasonLabel(reasons) {
     "block_pattern:generated_location_link_campaign": "Otomatik oluşturulan kampanya",
     "block_pattern:generated_name_location_link_campaign": "Üretilmiş ad hesabı kampanyası",
     "block_pattern:trakya_location_word_campaign": "Toplu Trakya konum kampanyası",
+    "block_pattern:trakya_location_dump_ad_campaign": "Toplu Trakya reklam konum listesi",
     "block_pattern:luleburgaz_short_link_campaign": "Kısa reklam kalıbı",
     "block_pattern:luleburgaz_ad_profile": "Reklam profili kalıbı",
     "block_pattern:luleburgaz_location_dump": "Toplu konum listesi",
