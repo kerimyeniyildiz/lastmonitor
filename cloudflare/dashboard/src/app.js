@@ -224,6 +224,14 @@ function renderFeed() {
   renderIcons();
 }
 
+function prependFeedItems(items) {
+  if (!items.length) return;
+  elements.feedList.insertAdjacentHTML("afterbegin", items.map(feedItemMarkup).join(""));
+  elements.feedEmpty.hidden = true;
+  elements.feedSummary.textContent = `${formatNumber(state.items.length)} kayıt gösteriliyor`;
+  renderIcons();
+}
+
 async function fetchFeed({ append = false, poll = false } = {}) {
   if (state.loading && !poll) return;
   if (!poll) state.loading = true;
@@ -239,7 +247,11 @@ async function fetchFeed({ append = false, poll = false } = {}) {
       if (!incoming.length) return;
       if (state.autoFlow && elements.feedScroller.scrollTop < 80) {
         state.items = [...incoming, ...state.items];
-        renderFeed();
+        if (state.search.trim()) {
+          renderFeed();
+        } else {
+          prependFeedItems(incoming);
+        }
         elements.feedScroller.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         const pendingKnown = new Set(state.pendingItems.map(itemKey));
@@ -254,8 +266,10 @@ async function fetchFeed({ append = false, poll = false } = {}) {
   } catch (error) {
     elements.feedSummary.textContent = error instanceof Error ? error.message : "Akış alınamadı";
   } finally {
-    if (!poll) state.loading = false;
-    renderFeed();
+    if (!poll) {
+      state.loading = false;
+      renderFeed();
+    }
   }
 }
 
