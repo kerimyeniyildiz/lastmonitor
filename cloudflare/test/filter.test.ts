@@ -63,6 +63,69 @@ describe("tweet filtering parity", () => {
     }
   });
 
+  it("drops the observed synthetic-profile Luleburgaz campaign", () => {
+    const samples = [
+      tweet(
+        "boya_amrutha_33",
+        "🖤",
+        "#edirNe kalem 💗 siyah #lüleburgAz",
+      ),
+      tweet(
+        "BharajBalbeer",
+        "🌸",
+        "oturuş 💌 #lüleburgAz sandalye #edirNe",
+      ),
+      tweet(
+        "MarioManhazr",
+        "Mario Manha",
+        "❤️‍🩹 Buz lüleburgaz #edirne kırkalerli gibi soğuk",
+      ),
+      tweet(
+        "sksivakumarcv",
+        "Sivakumar C V",
+        "BELLETMEN İP #çorlu ☹ İSKELESİ YIRTTIRMAK lüleburgaz",
+      ),
+    ];
+
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(config, "Lüleburgaz", item);
+      expect(reasons).toContain("block_pattern:luleburgaz_synthetic_profile_campaign");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("drops concatenated ad hashtags and explicit Luleburgaz ad profiles", () => {
+    const concatenated = tweet(
+      "Verkhatii",
+      "IRMAK",
+      "Ballı Ballı. #lüleburgaztrAvesti",
+    );
+    const explicitProfiles = [
+      tweet(
+        "KrklareTekBayan",
+        "Kırklareli Tek Bayan Asel",
+        "Lüleburgaz güvenilir ciddi düşünen Tek var mı.",
+      ),
+      tweet(
+        "KirklrelZeynep_",
+        "Kırklareli Dul Bayan Zeynep",
+        "Lüleburgaz Bu ne kııızzz",
+      ),
+    ];
+
+    const concatenatedReasons = evaluateTweetFilter(config, "Lüleburgaz", concatenated);
+    expect(concatenatedReasons).toContain(
+      "block_pattern:luleburgaz_concatenated_ad_hashtag",
+    );
+    expect(shouldDropTweet(concatenatedReasons)).toBe(true);
+
+    for (const item of explicitProfiles) {
+      const reasons = evaluateTweetFilter(config, "Lüleburgaz", item);
+      expect(reasons).toContain("block_pattern:luleburgaz_ad_profile");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
   it("drops dense Luleburgaz location ads without relying on handle shape", () => {
     const item = tweet(
       "janagama_ravi",
@@ -125,6 +188,11 @@ describe("tweet filtering parity", () => {
         "Trakya_Duyuru",
         "Trakya Duyuru",
         "Çorlu, Çerkezköy, Kapaklı, Tekirdağ ve Lüleburgaz ilçelerinde sağanak yağış bekleniyor",
+      ),
+      tweet(
+        "TrakyaHaber",
+        "Trakya Haber",
+        "#Edirne Lüleburgaz yolunda kaza meydana geldi 🚨",
       ),
     ];
     for (const item of samples) {
