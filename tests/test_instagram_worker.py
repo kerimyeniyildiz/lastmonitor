@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from contextlib import AbstractContextManager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from instagram_worker.client import build_client
+from instagram_worker.errors import is_login_required, requires_manual_attention
 from instagram_worker.models import normalize_item
 from instagram_worker.service import InstagramService
 from instagram_worker.storage import Storage
@@ -127,6 +130,102 @@ class InstagramScheduleTests(unittest.TestCase):
             self.assertEqual(service._next_interval(target), 900)
         with patch("instagram_worker.service.random.randint", return_value=1050):
             self.assertEqual(service._next_interval(target), 3000)
+
+
+class LoginRequired(Exception):
+    pass
+
+
+class ClientGraphqlError(Exception):
+    pass
+
+
+def masked_login_error() -> ClientGraphqlError:
+    try:
+        raise LoginRequired("login_required")
+    except LoginRequired:
+        try:
+            raise RuntimeError("fallback failed")
+        except RuntimeError:
+            try:
+                raise ClientGraphqlError("invalid request")
+            except ClientGraphqlError as error:
+                return error
+
+
+class FakeInstagramClient:
+    def __init__(self) -> None:
+        self.delay_range = []
+        self.relogin_calls = 0
+        self.dump_calls = 0
+
+    def set_country(self, _value):
+        pass
+
+    def set_country_code(self, _value):
+        pass
+
+    def set_locale(self, _value):
+        pass
+
+    def set_timezone_offset(self, _value):
+        pass
+
+    def load_settings(self, _path):
+        pass
+
+    def login(self, _username, _password, relogin=False, verification_code=""):
+        del verification_code
+        if relogin:
+            self.relogin_calls += 1
+
+    def account_info(self):
+        if self.relogin_calls == 0:
+            raise LoginRequired("login_required")
+        return SimpleNamespace(pk="1")
+
+    def dump_settings(self, _path):
+        self.dump_calls += 1
+
+
+class InstagramSessionTests(unittest.TestCase):
+    def config(self, directory: str):
+        session_file = Path(directory) / "session.json"
+        session_file.write_text("{}", encoding="utf-8")
+        return SimpleNamespace(
+            session_file=session_file,
+            username="monitor",
+            password="secret",
+        )
+
+    def fake_module(self, client: FakeInstagramClient) -> AbstractContextManager:
+        return patch.dict(
+            "sys.modules",
+            {"instagrapi": SimpleNamespace(Client=lambda: client)},
+        )
+
+    def test_background_start_rejects_an_expired_saved_session(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            client = FakeInstagramClient()
+            with self.fake_module(client):
+                with self.assertRaises(LoginRequired):
+                    build_client(self.config(directory), interactive=False)
+            self.assertEqual(client.relogin_calls, 0)
+            self.assertEqual(client.dump_calls, 0)
+
+    def test_manual_login_refreshes_an_expired_saved_session_once(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            client = FakeInstagramClient()
+            with self.fake_module(client):
+                result = build_client(self.config(directory), interactive=True)
+            self.assertIs(result, client)
+            self.assertEqual(client.relogin_calls, 1)
+            self.assertEqual(client.dump_calls, 1)
+
+    def test_masked_login_error_still_requires_manual_attention(self) -> None:
+        error = masked_login_error()
+        self.assertTrue(is_login_required(error))
+        self.assertTrue(requires_manual_attention(error))
 
 
 if __name__ == "__main__":

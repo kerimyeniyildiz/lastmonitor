@@ -12,20 +12,11 @@ import requests
 from .client import build_client
 from .config import Config, Target
 from .delivery import CloudflareDelivery
+from .errors import requires_manual_attention
 from .models import normalize_items
 from .storage import Storage
 
 LOGGER = logging.getLogger(__name__)
-ATTENTION_ERRORS = {
-    "ChallengeRequired",
-    "TwoFactorRequired",
-    "FeedbackRequired",
-    "PleaseWaitFewMinutes",
-    "LoginRequired",
-    "BadPassword",
-}
-
-
 class InstagramService:
     def __init__(self, config: Config, client=None):
         self.config = config
@@ -137,8 +128,11 @@ class InstagramService:
                 new_count,
                 f"{error_name}: {exc}",
             )
-            if error_name in ATTENTION_ERRORS:
-                LOGGER.error("Instagram requires manual attention: %s", error_name)
+            if requires_manual_attention(exc):
+                LOGGER.error(
+                    "Instagram requires manual attention: %s; worker will stop",
+                    error_name,
+                )
                 self.stop_event.set()
             raise
         finally:

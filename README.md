@@ -155,6 +155,13 @@ başlangıçlarını korur. `IG_SEND_EXISTING=false` olduğu için yeni eklenen 
 taraması sessizce başlangıç noktası oluşturur; normal yeniden başlatmalarda daha önce
 görülen içerikler yeniden gönderilmez.
 
+Yüklenen session, worker başlarken Instagram özel API'sindeki hesap bilgisiyle doğrulanır.
+Session geçersizse arka plan worker'ı kendiliğinden tekrar giriş denemez ve durur. Resmi
+Instagram uygulaması veya web sitesindeki olası güvenlik uyarısı tamamlandıktan sonra
+`login` komutu bir defalık temiz giriş yapar; ardından worker ayrıca `start` komutuyla
+başlatılır. Challenge, `login_required` ve benzeri hatalar başka bir exception içinde
+maskelense bile aynı güvenli durdurma davranışı uygulanır.
+
 İki hedef de her başarılı kontrolden sonra bağımsız olarak 15–50 dakika arasında
 rastgele bir sonraki kontrol zamanı seçer. Bu aralık ortalama istek sayısını sabit yarım
 saatlik düzene yakın tutarken kontrollerin düzenli aralıklarla tekrarlanmasını önler.

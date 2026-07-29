@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from .config import Config
+from .errors import is_login_required
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +38,8 @@ def build_client(
     if interactive:
         client.challenge_code_handler = _challenge_code_handler
 
-    if config.session_file.exists():
+    loaded_session = config.session_file.exists()
+    if loaded_session:
         client.load_settings(config.session_file)
         LOGGER.info("Saved Instagram session loaded")
     client.login(
@@ -45,6 +47,24 @@ def build_client(
         config.password,
         verification_code=verification_code,
     )
+    try:
+        client.account_info()
+    except Exception as exc:
+        if not loaded_session or not is_login_required(exc):
+            raise
+        if not interactive:
+            LOGGER.error(
+                "Saved Instagram session expired; run the manual login command"
+            )
+            raise
+        LOGGER.warning("Saved Instagram session expired; performing one clean relogin")
+        client.login(
+            config.username,
+            config.password,
+            relogin=True,
+            verification_code=verification_code,
+        )
+        client.account_info()
     config.session_file.parent.mkdir(parents=True, exist_ok=True)
     client.dump_settings(config.session_file)
     os.chmod(config.session_file, 0o600)
