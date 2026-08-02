@@ -148,6 +148,15 @@ durumunu görmek, başlatmak, durdurmak ve logu izlemek için:
 tail -f ~/.local/share/lastmonitor-instagram/worker.log
 ```
 
+Uzun bir kesintiden sonra güncel story ve gönderileri Telegram'a topluca yollamadan
+başlangıç noktası yapmak için worker kapalıyken aşağıdaki komut kullanılabilir. Bu işlem
+mevcut kayıtları silmez; yalnız daha önce görülmemiş güncel snapshot'ı `seeded` olarak
+kaydeder:
+
+```bash
+.venv-instagram/bin/python -m instagram_worker seed-current
+```
+
 Worker aynı süreç içinde tek Instagram istemcisi kullanır. Yeniden başlatıldığında
 `session.json` içindeki cihaz kimliği, çerezler ve oturum ayarları yüklenir; oturum geçerli
 olduğu sürece yeni parola girişi yapılmaz. `state.db` görülen içerik kimliklerini ve hedef

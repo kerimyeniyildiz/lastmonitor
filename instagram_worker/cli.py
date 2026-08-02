@@ -207,6 +207,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("check-config")
     subparsers.add_parser("login")
     subparsers.add_parser("run-once")
+    subparsers.add_parser("seed-current")
     subparsers.add_parser("run")
     subparsers.add_parser("install-launchd")
     subparsers.add_parser("start")
@@ -253,6 +254,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "run-once":
             service.run_once()
+        elif args.command == "seed-current":
+            fetched, seeded = service.seed_current()
+            print(
+                f"Instagram snapshot seeded: fetched={fetched} newly_seeded={seeded}"
+            )
         else:
             service.run_forever()
     finally:

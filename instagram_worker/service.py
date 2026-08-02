@@ -75,7 +75,11 @@ class InstagramService:
         except Exception as exc:  # Run telemetry must not stop monitoring.
             LOGGER.warning("Instagram run report failed: %s", exc)
 
-    def check_target(self, target: Target) -> tuple[int, int, int]:
+    def check_target(
+        self,
+        target: Target,
+        force_seed: bool = False,
+    ) -> tuple[int, int, int]:
         started_at = datetime.now(timezone.utc).isoformat()
         fetched_count = 0
         new_count = 0
@@ -100,6 +104,7 @@ class InstagramService:
                     group_name,
                     events,
                     self.config.send_existing,
+                    force_seed=force_seed,
                 )
                 new_count += new
                 seeded_count += seeded
@@ -140,6 +145,20 @@ class InstagramService:
                 target.username,
                 time.time() + self._next_interval(target),
             )
+
+    def seed_current(self) -> tuple[int, int]:
+        fetched_total = 0
+        seeded_total = 0
+        for target in self.config.targets:
+            fetched, _new, seeded = self.check_target(target, force_seed=True)
+            fetched_total += fetched
+            seeded_total += seeded
+        LOGGER.info(
+            "Instagram current snapshot seeded fetched=%d seeded=%d",
+            fetched_total,
+            seeded_total,
+        )
+        return fetched_total, seeded_total
 
     def deliver_due(self) -> int:
         delivered = 0

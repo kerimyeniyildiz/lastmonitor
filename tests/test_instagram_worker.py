@@ -119,6 +119,26 @@ class InstagramStorageTests(unittest.TestCase):
             )
             storage.close()
 
+    def test_force_seed_silently_records_items_after_an_existing_baseline(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            storage = Storage(Path(directory) / "state.db")
+            first = normalize_item(media(pk="1_1", code="ONE"), "target", "feed")
+            second = normalize_item(media(pk="2_2", code="TWO"), "target", "feed")
+            assert first is not None and second is not None
+
+            storage.add_group("target", "feed", [first], send_existing=False)
+            new_count, seeded_count = storage.add_group(
+                "target",
+                "feed",
+                [first, second],
+                send_existing=False,
+                force_seed=True,
+            )
+
+            self.assertEqual((new_count, seeded_count), (0, 1))
+            self.assertEqual(storage.pending_count(), 0)
+            storage.close()
+
 
 class InstagramScheduleTests(unittest.TestCase):
     def test_random_interval_stays_between_fifteen_and_fifty_minutes(self) -> None:

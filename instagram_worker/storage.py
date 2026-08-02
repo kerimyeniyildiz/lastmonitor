@@ -113,13 +113,18 @@ class Storage:
         group_name: str,
         events: list[InstagramEvent],
         send_existing: bool,
+        force_seed: bool = False,
     ) -> tuple[int, int]:
         baseline = self.connection.execute(
             "SELECT 1 FROM baselines WHERE username = ? AND group_name = ?",
             (username, group_name),
         ).fetchone()
         first_run = baseline is None
-        status = "pending" if send_existing or not first_run else "seeded"
+        status = (
+            "seeded"
+            if force_seed or (first_run and not send_existing)
+            else "pending"
+        )
         inserted = 0
         seeded = 0
         with self.connection:
