@@ -140,20 +140,34 @@ describe("tweet filtering parity", () => {
   });
 
   it("drops dense Trakya location ads regardless of the search query", () => {
-    const item = tweet(
-      "naik_ravinaik",
-      "ÜNİVERSİTELİ KIZLAR",
-      "Sevgi varsa yol bulunur 🛤️📷 edirne,kırklareli,kapaklı,tekirdağ,lüleburgaz,şarkköy,malkara,hayrabolu,saray,ergene,muratlı,marmaraereğlisi,bayan,",
-    );
+    const samples = [
+      tweet(
+        "naik_ravinaik",
+        "ÜNİVERSİTELİ KIZLAR",
+        "Sevgi varsa yol bulunur 🛤️📷 edirne,kırklareli,kapaklı,tekirdağ,lüleburgaz,şarkköy,malkara,hayrabolu,saray,ergene,muratlı,marmaraereğlisi,bayan,",
+      ),
+      tweet(
+        "Omer57205569",
+        "ÇITIR KIZLAR",
+        "Hayat sevdikçe güzel dostum💗kapaklı,saray,kırklareli,lüleburgaz, çorlu,çerkezköy,tekirdağ,bayan,",
+      ),
+      tweet(
+        "NataliaHoprqak",
+        "Suzan",
+        "Huzur, en büyük servettir ☯️ çorlu,çerkezköy,lüleburgaz,bayan,",
+      ),
+    ];
 
-    const reasons = evaluateTweetFilter(
-      { ...config, blockedTweetHandles: [] },
-      "Kırklareli",
-      item,
-    );
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(
+        { ...config, blockedTweetHandles: [] },
+        "Kırklareli",
+        item,
+      );
 
-    expect(reasons).toContain("block_pattern:trakya_location_dump_ad_campaign");
-    expect(shouldDropTweet(reasons)).toBe(true);
+      expect(reasons).toContain("block_pattern:trakya_location_dump_ad_campaign");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
   });
 
   it("keeps natural multi-location regional reports", () => {

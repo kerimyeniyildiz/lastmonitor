@@ -324,8 +324,8 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
   );
   if (
     hasLink &&
-    campaignLocationMentions >= 8 &&
-    countChar(tweet.text, ",") >= 8 &&
+    campaignLocationMentions >= 3 &&
+    countChar(tweet.text, ",") >= 3 &&
     hasCampaignProfileTerm &&
     containsPictographicSymbol(tweet.text)
   ) {
