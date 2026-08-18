@@ -67,6 +67,17 @@ class Storage:
         )
         self.connection.commit()
 
+    def retain_targets(self, usernames: list[str]) -> None:
+        if not usernames:
+            self.connection.execute("DELETE FROM target_state")
+        else:
+            placeholders = ", ".join("?" for _ in usernames)
+            self.connection.execute(
+                f"DELETE FROM target_state WHERE username NOT IN ({placeholders})",
+                usernames,
+            )
+        self.connection.commit()
+
     def due_targets(self, now: float) -> list[str]:
         rows = self.connection.execute(
             "SELECT username FROM target_state WHERE next_run_at <= ? ORDER BY next_run_at, username",

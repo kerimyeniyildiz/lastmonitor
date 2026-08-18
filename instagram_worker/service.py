@@ -27,6 +27,7 @@ class InstagramService:
         self.targets = {target.username: target for target in config.targets}
         for username in self.targets:
             self.storage.ensure_target(username)
+        self.storage.retain_targets(list(self.targets))
 
     def close(self) -> None:
         self.storage.close()

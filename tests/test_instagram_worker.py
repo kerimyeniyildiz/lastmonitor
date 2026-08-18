@@ -87,6 +87,17 @@ class InstagramNormalizationTests(unittest.TestCase):
 
 
 class InstagramStorageTests(unittest.TestCase):
+    def test_removed_targets_are_not_left_in_the_schedule(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            storage = Storage(Path(directory) / "state.db")
+            storage.ensure_target("active")
+            storage.ensure_target("removed")
+
+            storage.retain_targets(["active"])
+
+            self.assertEqual(storage.due_targets(0), ["active"])
+            storage.close()
+
     def test_first_group_is_seeded_and_later_items_are_pending(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             storage = Storage(Path(directory) / "state.db")
