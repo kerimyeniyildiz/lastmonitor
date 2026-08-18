@@ -124,6 +124,57 @@ describe("tweet filtering parity", () => {
       expect(reasons).toContain("block_pattern:luleburgaz_ad_profile");
       expect(shouldDropTweet(reasons)).toBe(true);
     }
+
+    const profileOnlyAd = tweet(
+      "DelbertNgum4fg",
+      "BİLGİ-PROFİLDE-👈RÜYA",
+      "Gerçekler acıtır ama öğretir. çorlu,çerkezköy,lüleburgaz,bayan,",
+    );
+    profileOnlyAd.text = profileOnlyAd.text.replace(" https://t.co/example", "");
+    const profileOnlyReasons = evaluateTweetFilter(config, "Lüleburgaz", profileOnlyAd);
+    expect(profileOnlyReasons).toContain("block_pattern:luleburgaz_ad_profile");
+    expect(shouldDropTweet(profileOnlyReasons)).toBe(true);
+  });
+
+  it("drops repeated normalized locations hidden in generated text", () => {
+    const samples = [
+      tweet(
+        "John82133296370",
+        "John",
+        "☹ öfkelenmişti. Bütün süper kahramanlar tekirdağ tekirdag lüleburgaz sehpasıydı. Demirden.",
+      ),
+      tweet(
+        "John82133296370",
+        "John",
+        "Üç, tekirdağ tekirdag lüleburgaz ☹ ulusal kanallarda cihazını kapattı, ardından",
+      ),
+    ];
+
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(config, "Lüleburgaz", item);
+      expect(reasons).toContain("block_pattern:luleburgaz_repeated_location_campaign");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("drops explicit solicitation only when paired with several locations", () => {
+    const solicitation = tweet(
+      "muratk687288",
+      "Efsane",
+      "@kırklareli @lüleburgaz @babaeski @edirne dil masajı yaptırmak isteyen varmi sevişmek istiyorum",
+    );
+    solicitation.text = solicitation.text.replace(" https://t.co/example", "");
+
+    const reasons = evaluateTweetFilter(config, "Kırklareli", solicitation);
+    expect(reasons).toContain("block_pattern:multi_location_explicit_solicitation");
+    expect(shouldDropTweet(reasons)).toBe(true);
+
+    const quotedNews = tweet(
+      "yerelhaber",
+      "Yerel Haber",
+      "Kırklareli'de duvara 'sevişmek istiyorum' yazan kişi hakkında işlem başlatıldı",
+    );
+    expect(shouldDropTweet(evaluateTweetFilter(config, "Kırklareli", quotedNews))).toBe(false);
   });
 
   it("drops dense Luleburgaz location ads without relying on handle shape", () => {
