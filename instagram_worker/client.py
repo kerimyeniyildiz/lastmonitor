@@ -10,6 +10,23 @@ from .config import Config
 from .errors import is_login_required
 
 LOGGER = logging.getLogger(__name__)
+DEFAULT_HTTP_TIMEOUT = (10, 30)
+
+
+def apply_default_timeout(session, timeout=DEFAULT_HTTP_TIMEOUT) -> None:
+    original_request = session.request
+
+    def request(method, url, **kwargs):
+        if kwargs.get("timeout") is None:
+            kwargs["timeout"] = timeout
+        return original_request(method, url, **kwargs)
+
+    session.request = request
+
+
+def apply_client_timeouts(client) -> None:
+    apply_default_timeout(client.private)
+    apply_default_timeout(client.public)
 
 
 def _challenge_code_handler(_username: str, choice: object) -> str:
@@ -42,6 +59,7 @@ def build_client(
     if loaded_session:
         client.load_settings(config.session_file)
         LOGGER.info("Saved Instagram session loaded")
+    apply_client_timeouts(client)
     client.login(
         config.username,
         config.password,

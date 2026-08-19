@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from instagram_worker.client import build_client
+from instagram_worker.client import apply_default_timeout, build_client
 from instagram_worker.errors import is_login_required, requires_manual_attention
 from instagram_worker.models import normalize_item
 from instagram_worker.service import InstagramService
@@ -189,6 +189,8 @@ class FakeInstagramClient:
         self.delay_range = []
         self.relogin_calls = 0
         self.dump_calls = 0
+        self.private = FakeSession()
+        self.public = FakeSession()
 
     def set_country(self, _value):
         pass
@@ -217,6 +219,33 @@ class FakeInstagramClient:
 
     def dump_settings(self, _path):
         self.dump_calls += 1
+
+
+class FakeSession:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def request(self, method, url, **kwargs):
+        self.calls.append((method, url, kwargs))
+        return kwargs
+
+
+class InstagramTimeoutTests(unittest.TestCase):
+    def test_default_timeout_is_added_when_library_omits_it(self) -> None:
+        session = FakeSession()
+        apply_default_timeout(session, (10, 30))
+
+        result = session.request("GET", "https://example.test")
+
+        self.assertEqual(result["timeout"], (10, 30))
+
+    def test_explicit_timeout_is_preserved(self) -> None:
+        session = FakeSession()
+        apply_default_timeout(session, (10, 30))
+
+        result = session.request("GET", "https://example.test", timeout=5)
+
+        self.assertEqual(result["timeout"], 5)
 
 
 class InstagramSessionTests(unittest.TestCase):
