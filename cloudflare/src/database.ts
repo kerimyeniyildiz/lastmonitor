@@ -74,17 +74,37 @@ export async function reserveNews(
   const result = await db
     .prepare(
       `INSERT INTO news (
-         link, source, news_created_at, delivery_status, fetched_at
-       ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+         link, source, title, news_created_at, delivery_status, fetched_at
+       ) VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(link) DO UPDATE SET
+         title = COALESCE(excluded.title, news.title),
          delivery_status = excluded.delivery_status,
          fetched_at = CURRENT_TIMESTAMP
        WHERE news.delivery_status = 'send_failed'
          AND news.fetched_at <= datetime('now', '-2 minutes')`,
     )
-    .bind(entry.link, entry.source, entry.createdAt, status)
+    .bind(entry.link, entry.source, entry.title, entry.createdAt, status)
     .run();
   return (result.meta.changes ?? 0) > 0;
+}
+
+export async function getNewsTitle(db: D1Database, link: string): Promise<string | null> {
+  const row = await db
+    .prepare("SELECT title FROM news WHERE link = ?")
+    .bind(link)
+    .first<{ title: string | null }>();
+  return row?.title?.trim() || null;
+}
+
+export async function updateNewsTitle(
+  db: D1Database,
+  link: string,
+  title: string,
+): Promise<void> {
+  await db
+    .prepare("UPDATE news SET title = ? WHERE link = ?")
+    .bind(title, link)
+    .run();
 }
 
 export async function updateNewsStatus(

@@ -21,6 +21,24 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
+const HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  hellip: "...",
+  laquo: "\u00ab",
+  ldquo: "\u201c",
+  lsquo: "\u2018",
+  lt: "<",
+  mdash: "\u2014",
+  nbsp: " ",
+  ndash: "\u2013",
+  quot: '"',
+  raquo: "\u00bb",
+  rdquo: "\u201d",
+  rsquo: "\u2019",
+};
+
 function toArray<T>(value: T | T[] | undefined): T[] {
   if (value === undefined) return [];
   return Array.isArray(value) ? value : [value];
@@ -30,6 +48,70 @@ function textValue(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number") return String(value);
   return "";
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value.replace(/&(#(?:x[\da-f]+|\d+)|[a-z][\w]+);/giu, (entity, name: string) => {
+    if (name.startsWith("#")) {
+      const hexadecimal = name[1]?.toLowerCase() === "x";
+      const codePoint = Number.parseInt(name.slice(hexadecimal ? 2 : 1), hexadecimal ? 16 : 10);
+      if (Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff) {
+        return String.fromCodePoint(codePoint);
+      }
+      return entity;
+    }
+    return HTML_ENTITIES[name.toLowerCase()] ?? entity;
+  });
+}
+
+function cleanTitle(value: string): string | null {
+  const title = decodeHtmlEntities(value)
+    .replace(/<[^>]*>/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return title ? title.slice(0, 500) : null;
+}
+
+function tagAttributes(tag: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  const pattern = /([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>]+))/gu;
+  for (const match of tag.matchAll(pattern)) {
+    attributes[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? "";
+  }
+  return attributes;
+}
+
+export function extractNewsTitle(html: string): string | null {
+  const candidates = new Map<string, string>();
+  for (const tag of html.match(/<meta\b[^>]*>/giu) ?? []) {
+    const attributes = tagAttributes(tag);
+    const key = (attributes.property || attributes.name || "").toLowerCase();
+    if ((key === "og:title" || key === "twitter:title") && attributes.content) {
+      candidates.set(key, attributes.content);
+    }
+  }
+  for (const key of ["og:title", "twitter:title"]) {
+    const title = cleanTitle(candidates.get(key) ?? "");
+    if (title) return title;
+  }
+  const documentTitle = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/iu)?.[1] ?? "";
+  return cleanTitle(documentTitle);
+}
+
+export async function fetchNewsTitle(link: string): Promise<string | null> {
+  const response = await fetch(link, {
+    headers: {
+      accept: "text/html,application/xhtml+xml",
+      "user-agent": "lastmonitor-cloudflare/0.1",
+    },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error(`News page ${response.status}: ${link}`);
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+  if (contentType && !contentType.includes("text/html") && !contentType.includes("xhtml")) {
+    return null;
+  }
+  return extractNewsTitle(await response.text());
 }
 
 interface ParsedSitemap {
@@ -80,6 +162,11 @@ export function buildSitemapUrls(config: AppConfig, now = new Date()): string[] 
   return [...new Set(urls)];
 }
 
+export function isNewsArticleUrl(url: URL): boolean {
+  if (url.pathname === "/" || url.pathname === "") return false;
+  return !IMAGE_EXTENSIONS.some((extension) => url.pathname.toLowerCase().endsWith(extension));
+}
+
 async function fetchSitemap(url: string): Promise<ParsedSitemap> {
   const response = await fetch(url, {
     headers: { "user-agent": "lastmonitor-cloudflare/0.1" },
@@ -111,14 +198,13 @@ export async function fetchNewsEntries(config: AppConfig): Promise<NewsEntry[]> 
     } catch {
       continue;
     }
-    if (IMAGE_EXTENSIONS.some((extension) => parsedUrl.pathname.toLowerCase().endsWith(extension))) {
-      continue;
-    }
+    if (!isNewsArticleUrl(parsedUrl)) continue;
     const created = parseDate(item.lastmod);
     if (created && config.newsMaxAgeHours && created.getTime() < cutoff) continue;
     unique.set(item.link, {
       link: item.link,
       source: parsedUrl.hostname.replace(/^www\./u, ""),
+      title: null,
       createdAt: created?.toISOString() ?? null,
       sortTimestamp: created?.getTime() ?? 0,
     });
@@ -143,6 +229,7 @@ export function buildNewsMessage(entry: NewsEntry): string {
   return [
     "📰 Yeni Haber",
     "",
+    ...(entry.title ? [`📝 Başlık: ${entry.title}`, ""] : []),
     `🌐 Kaynak: ${entry.source || "Bilinmiyor"}`,
     `🕒 Tarih: ${createdAt}`,
     `🔗 Link: ${entry.link}`,

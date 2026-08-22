@@ -76,7 +76,7 @@ async function listNews(requestUrl: URL, env: Env): Promise<Response> {
   const offset = parseOffset(requestUrl.searchParams.get("offset"));
   const result = await env.DB
     .prepare(
-      `SELECT link, source, news_created_at, delivery_status, fetched_at
+      `SELECT link, source, title, news_created_at, delivery_status, fetched_at
        FROM news
        ORDER BY COALESCE(news_created_at, fetched_at) DESC
        LIMIT ? OFFSET ?`,

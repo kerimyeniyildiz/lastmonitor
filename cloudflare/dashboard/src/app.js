@@ -173,7 +173,9 @@ function feedItemMarkup(item) {
     : isInstagram
       ? `@${item.user_handle} · ${instagramLabels[item.content_type] || "Instagram"}`
       : `${item.user_handle ? `@${item.user_handle}` : "X"}${item.query ? ` · ${item.query}` : ""}`;
-  const copy = isNews ? titleFromUrl(item.link) : item.text || (isInstagram ? "Yeni Instagram içeriği" : "");
+  const copy = isNews
+    ? item.text || titleFromUrl(item.link)
+    : item.text || (isInstagram ? "Yeni Instagram içeriği" : "");
   const longCopy = copy.length > 360;
   const badge = filtered
     ? reasonLabel(item.filter_reasons) || "Filtrelendi"

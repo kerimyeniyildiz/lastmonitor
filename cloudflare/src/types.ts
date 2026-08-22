@@ -63,6 +63,7 @@ export interface Tweet {
 export interface NewsEntry {
   link: string;
   source: string;
+  title: string | null;
   createdAt: string | null;
   sortTimestamp: number;
 }

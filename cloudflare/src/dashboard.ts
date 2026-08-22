@@ -99,7 +99,7 @@ function feedSource(view: string): string {
     WHERE delivery_status = '${status}'`;
   const news = `
     SELECT id AS item_id, 'news' AS kind, NULL AS query, NULL AS user_handle,
-           NULL AS user_name, NULL AS text, link, source, delivery_status,
+           NULL AS user_name, title AS text, link, source, delivery_status,
            '[]' AS filter_reasons,
            NULL AS preview_url, NULL AS content_type,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${newsEventAt}) AS display_at
