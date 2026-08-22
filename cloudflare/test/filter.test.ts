@@ -177,6 +177,85 @@ describe("tweet filtering parity", () => {
     expect(shouldDropTweet(evaluateTweetFilter(config, "Kırklareli", quotedNews))).toBe(false);
   });
 
+  it("drops linkless dense location ads with abbreviated contact profiles", () => {
+    const samples = [
+      tweet(
+        "SamObrienluwd",
+        "İLTŞM-PROFİLDE-👈RÜYA",
+        "Karanlık ışığın değerini. çorlu,çerkezköy,bayan,kapaklı,malkara,tekirdağ,lüleburgaz,muratlı,hayrabolu,şarkköy,ergene,saray,marmaraereğlisi,",
+      ),
+      tweet(
+        "ThelmaWhipavyq",
+        "İLTİŞİM PROFİLDE SİBEL",
+        "Hayat küçük anlarda gizlidir. çorlu,çerkezköy,kapaklı,malkara,tekirdağ,lüleburgaz,bayan,",
+      ),
+    ];
+
+    for (const item of samples) {
+      item.text = item.text.replace(" https://t.co/example", "");
+      const reasons = evaluateTweetFilter(config, "Lüleburgaz", item);
+      expect(reasons).toContain("block_pattern:trakya_location_dump_ad_campaign");
+      expect(reasons).toContain("block_pattern:luleburgaz_ad_profile");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("drops the expanded generated-name word-salad campaign", () => {
+    const samples = [
+      tweet(
+        "Alexandriaqm5j",
+        "Alexandria Fleming",
+        "tuz ekmek hakkı 💐 keyfetme #kırklareli nite",
+      ),
+      tweet(
+        "LillianAndqww7",
+        "Lillian Andrews",
+        "lambası ikaz #kırklareli ☹ hırslanış başmakçı",
+      ),
+      tweet(
+        "Earnestinewfov",
+        "Earnestine Dubray",
+        "kravatlıca #kırklareli 🤨 nedeniyle soyluluk",
+      ),
+    ];
+
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(config, "Kırklareli", item);
+      expect(reasons, item.userHandle).toContain(
+        "block_pattern:generated_name_location_link_campaign",
+      );
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("drops location-based adult solicitations but keeps ordinary uses of active", () => {
+    const solicitations = [
+      tweet(
+        "soekdprlfp",
+        "j",
+        "lüleburgaz aktifler hemen yazsın, genç pasifim #gay #aktif #pasif #seks #sakso",
+      ),
+      tweet(
+        "HakanGonzales",
+        "Mario Gonzales",
+        "Lüleburgaz'da yeri olan aktif var mı? 30 yaşında pasifim #aktif #pasif",
+      ),
+      tweet("Vajinalorg60030", "vajinal orgazm yaşatırım", "#lüleburgaz uyumuş"),
+    ];
+    for (const item of solicitations) {
+      const reasons = evaluateTweetFilter(config, "Lüleburgaz", item);
+      expect(reasons).toContain("block_pattern:location_personal_solicitation");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+
+    const announcement = tweet(
+      "AnahtarParti39",
+      "Anahtar Parti Kırklareli",
+      "Kırklareli'nde en aktif il başkanı araştırmasının sonuçları açıklandı",
+    );
+    expect(shouldDropTweet(evaluateTweetFilter(config, "Kırklareli", announcement))).toBe(false);
+  });
+
   it("drops dense Luleburgaz location ads without relying on handle shape", () => {
     const item = tweet(
       "janagama_ravi",

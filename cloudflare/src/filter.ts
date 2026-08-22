@@ -16,6 +16,7 @@ export const DROPPABLE_FILTER_REASONS = new Set([
   "block_pattern:luleburgaz_ad_profile",
   "block_pattern:luleburgaz_location_dump",
   "block_pattern:multi_location_explicit_solicitation",
+  "block_pattern:location_personal_solicitation",
 ]);
 
 const LULEBURGAZ_CAMPAIGN_LOCATION_TERMS = [
@@ -38,8 +39,48 @@ const LULEBURGAZ_CAMPAIGN_LOCATION_TERMS = [
 ];
 const LULEBURGAZ_CAMPAIGN_PROFILE_TERMS = ["bayan", "escort", "eskort"];
 const LULEBURGAZ_AD_PROFILE_PHRASES = ["tekbayan", "dulbayan"];
-const LULEBURGAZ_PROFILE_ONLY_AD_PHRASES = ["bilgiprofilde"];
+const LULEBURGAZ_PROFILE_ONLY_AD_PHRASES = [
+  "bilgiprofilde",
+  "iletisimprofilde",
+  "iltisimprofilde",
+  "iltsmprofilde",
+];
 const LULEBURGAZ_CONCATENATED_AD_TERMS = ["travesti", "escort", "eskort", "bayan"];
+const PERSONAL_ADULT_TERMS = [
+  "aktif",
+  "pasif",
+  "gay",
+  "mature",
+  "seks",
+  "sex",
+  "sakso",
+  "cuckold",
+  "swinger",
+  "vajinal",
+  "orgazm",
+  "ensest",
+];
+const STRONG_PERSONAL_ADULT_TERMS = [
+  "seks",
+  "sex",
+  "sakso",
+  "cuckold",
+  "swinger",
+  "vajinal",
+  "orgazm",
+  "ensest",
+];
+const PERSONAL_SOLICITATION_PHRASES = [
+  "varmi",
+  "yazin",
+  "yazsin",
+  "ariyorum",
+  "ariyoruz",
+  "beklerim",
+  "bulusmak",
+  "hemenyaz",
+  "dmyebeklerim",
+];
 const TRAKYA_LOCATION_CAMPAIGN_TERMS = [
   "kırklareli",
   "kirklareli",
@@ -102,6 +143,7 @@ function comparableName(value: string): string {
     .normalize("NFKD")
     .replace(/\p{M}/gu, "")
     .toLowerCase()
+    .replaceAll("ı", "i")
     .replace(/[^a-z0-9]/g, "");
 }
 
@@ -135,6 +177,40 @@ function looksLikeGeneratedNameHandle(handle: string, displayName: string): bool
     randomSuffix.length >= 2 &&
     randomSuffix.length <= 4 &&
     !/^\d+$/.test(randomSuffix);
+}
+
+function looksLikeFirstNameReplacementHandle(handle: string, displayName: string): boolean {
+  const rawHandle = handle.trim();
+  const nameParts = displayName
+    .trim()
+    .split(/\s+/u)
+    .map(comparableName)
+    .filter(Boolean);
+  if (
+    rawHandle.includes("_") ||
+    !/^[A-Za-z0-9]{8,24}$/.test(rawHandle) ||
+    nameParts.length !== 2 ||
+    nameParts[0].length < 5 ||
+    nameParts[1].length < 4
+  ) {
+    return false;
+  }
+
+  const normalizedHandle = comparableName(rawHandle);
+  const [firstName, surname] = nameParts;
+  if (!normalizedHandle.startsWith(firstName)) return false;
+  const replacement = normalizedHandle.slice(firstName.length);
+  if (replacement.length < 3 || replacement.length > 7) return false;
+
+  let surnamePrefix = 0;
+  while (
+    surnamePrefix < replacement.length &&
+    surnamePrefix < surname.length &&
+    replacement[surnamePrefix] === surname[surnamePrefix]
+  ) {
+    surnamePrefix += 1;
+  }
+  return surnamePrefix <= 2;
 }
 
 function editDistance(left: string, right: string): number {
@@ -214,6 +290,13 @@ function normalizedWordCounts(value: string): Map<string, number> {
   return counts;
 }
 
+function matchingWordStemTerms(value: string, terms: string[]): string[] {
+  const words = [...normalizedWordCounts(value).keys()];
+  return terms.filter((term) =>
+    words.some((word) => word === term || (word.startsWith(term) && word.length <= term.length + 5))
+  );
+}
+
 function hasRepeatedLocationVariant(text: string, locationTerms: Set<string>): boolean {
   const termKeys = new Set(
     [...locationTerms]
@@ -291,6 +374,7 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
   }
 
   const locationMentions = countLocationMentions(tweet.text, locationTerms);
+  const nonLocationWordCount = countNonLocationWords(tweet.text, locationTerms);
   if (hasLink && locationMentions >= 3 && meaningfulLength <= 45) {
     reasons.push("block_pattern:location_word_soup_link");
   }
@@ -316,9 +400,29 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
   if (
     hasLink &&
     locationMentions >= 1 &&
-    countNonLocationWords(tweet.text, locationTerms) <= 3 &&
+    nonLocationWordCount <= 3 &&
     containsPictographicSymbol(tweet.text) &&
     looksLikeGeneratedNameHandle(tweet.userHandle, tweet.userName)
+  ) {
+    reasons.push("block_pattern:generated_name_location_link_campaign");
+  }
+  const looksLikeExpandedGeneratedCampaign =
+    (
+      nonLocationWordCount >= 4 &&
+      nonLocationWordCount <= 6 &&
+      looksLikeGeneratedNameHandle(tweet.userHandle, tweet.userName)
+    ) ||
+    (
+      nonLocationWordCount >= 3 &&
+      nonLocationWordCount <= 6 &&
+      looksLikeFirstNameReplacementHandle(tweet.userHandle, tweet.userName)
+    );
+  if (
+    hasLink &&
+    locationMentions >= 1 &&
+    locationHashtags.length >= 1 &&
+    containsPictographicSymbol(tweet.text) &&
+    looksLikeExpandedGeneratedCampaign
   ) {
     reasons.push("block_pattern:generated_name_location_link_campaign");
   }
@@ -345,26 +449,52 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
   );
   const profile = `${tweet.userHandle} ${tweet.userName}`.toLowerCase();
   const campaignText = tweet.text.toLowerCase();
+  const comparableProfile = comparableName(profile);
+  const hasContactProfilePhrase = LULEBURGAZ_PROFILE_ONLY_AD_PHRASES.some(
+    (term) => comparableProfile.includes(term),
+  );
   const hasCampaignProfileTerm = LULEBURGAZ_CAMPAIGN_PROFILE_TERMS.some(
     (term) => profile.includes(term) || campaignText.includes(term),
   );
   if (
-    hasLink &&
     campaignLocationMentions >= 3 &&
     countChar(tweet.text, ",") >= 3 &&
-    hasCampaignProfileTerm &&
-    containsPictographicSymbol(tweet.text)
+    (hasCampaignProfileTerm || hasContactProfilePhrase) &&
+    (hasLink || containsPictographicSymbol(tweet.text) || hasContactProfilePhrase)
   ) {
     reasons.push("block_pattern:trakya_location_dump_ad_campaign");
   }
 
-  const compactProfile = compactText(profile);
   if (
     isLuleburgazQuery(query) &&
     campaignLocationMentions >= 1 &&
-    LULEBURGAZ_PROFILE_ONLY_AD_PHRASES.some((term) => compactProfile.includes(term))
+    hasContactProfilePhrase
   ) {
     reasons.push("block_pattern:luleburgaz_ad_profile");
+  }
+
+  const personalHaystack = `${tweet.text} ${tweet.userName}`;
+  const personalAdultTerms = matchingWordStemTerms(personalHaystack, PERSONAL_ADULT_TERMS);
+  const hasStrongAdultProfileTerm = matchingWordStemTerms(
+    profile,
+    STRONG_PERSONAL_ADULT_TERMS,
+  ).length > 0;
+  const hasStrongAdultTextTerm = matchingWordStemTerms(
+    tweet.text,
+    STRONG_PERSONAL_ADULT_TERMS,
+  ).length > 0;
+  const comparableTweetText = comparableName(tweet.text);
+  const hasPersonalSolicitation = PERSONAL_SOLICITATION_PHRASES.some(
+    (phrase) => comparableTweetText.includes(phrase),
+  );
+  if (
+    locationMentions >= 1 &&
+    (
+      hasStrongAdultProfileTerm ||
+      (hasPersonalSolicitation && (hasStrongAdultTextTerm || personalAdultTerms.length >= 2))
+    )
+  ) {
+    reasons.push("block_pattern:location_personal_solicitation");
   }
 
   if (
@@ -380,7 +510,7 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
       shortCampaignHandle || looksLikeAutogeneratedHandle(tweet.userHandle);
     const remainingWords = countNonLocationWords(tweet.text, campaignLocationTerms);
     const hasExplicitAdProfilePhrase = LULEBURGAZ_AD_PROFILE_PHRASES.some(
-      (term) => compactProfile.includes(term),
+      (term) => comparableProfile.includes(term),
     );
     const hasConcatenatedAdHashtag = hashtags.some((hashtag) => {
       const compactHashtag = compactText(hashtag);

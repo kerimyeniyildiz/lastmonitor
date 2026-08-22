@@ -77,11 +77,11 @@ TWEET_FILTER_BYPASS_QUERIES=from:mustafaciftcitr,Valikirklareli,KirklareliEmn
 TWEET_REQUIRED_PREFIXES=from:bpthaber=>SON DAKİKA
 ```
 
-`drop` modunda güvenli görülen spamler Telegram'a gönderilmez. Şu an `BLOCKED_TWEET_TERMS` eşleşmeleri, sadece lokasyon hashtag'i + link içeren paylaşımlar ve rakam ekli üretilmiş hesapların kısa lokasyon-link kampanyaları düşürülür. `WATCH_TWEET_TERMS` ve telefon numarası gibi diğer sinyaller logda kalır; yanlış pozitif riskini ölçmeden bunlara göre susturma yapılmaz. Geçici gözlem için `TWEET_FILTER_MODE=log`, tamamen kapatmak için `TWEET_FILTER_MODE=off` kullanılabilir. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
+`drop` modunda yüksek güvenli spamler Telegram'a gönderilmez ve D1'de `filtered` olarak saklanır. `BLOCKED_TWEET_TERMS` eşleşmeleri; üretilmiş hesapların kısa konum kampanyaları, yoğun Trakya reklam listeleri ve konumlu yetişkin ilanlarında birden fazla sinyalin beraber bulunduğu kalıplar düşürülür. `WATCH_TWEET_TERMS` ve telefon numarası gibi zayıf sinyaller tek başına engelleme yapmaz. Geçici gözlem için `TWEET_FILTER_MODE=log`, tamamen kapatmak için `TWEET_FILTER_MODE=off` kullanılabilir. `from:` sorguları varsayılan olarak filtreyi bypass eder; resmi/kurumsal kaynaklarda kritik kelime geçse bile bildirim kaçırmamak için bu bilinçli bir tercihtir.
 
 Kesin spam olduğu doğrulanan hesaplar `BLOCKED_TWEET_HANDLES` ile kullanıcı adı bazında
 engellenebilir. Ayrıca ad-soyadla eşleşen fakat sonu rastgele harf/rakamlarla bozulan
-hesaplar; yalnızca kısa anlamsız metin, konum etiketi, emoji ve bağlantı sinyallerinin
+hesaplar; yalnızca kısa anlamsız metin, konum etiketi, emoji ve medya bağlantısı sinyallerinin
 tamamı birlikteyse otomatik kampanya olarak düşürülür.
 Kırklareli, Edirne, Havsa ve Kapıkule adlarını birlikte kullanan eski kampanya da ancak
 üretilmiş profil, bağlantı ve emoji sinyalleri beraber olduğunda engellenir.
@@ -90,7 +90,7 @@ Kırklareli, Edirne, Havsa ve Kapıkule adlarını birlikte kullanan eski kampan
 
 Filtre nedenlerinde `blocked_term:*` ve `block_pattern:*` Telegram'a gönderilmeyen kesin kararları, `watch_term:*` ve `watch_pattern:phone_number` ise yalnızca ölçülen sinyalleri ifade eder.
 
-Lüleburgaz sorgusunda gözlenen otomatik reklam kampanyası ayrıca birleşik sinyallerle süzülür. Yalnızca uzun rakam dizili kullanıcı adı, konum, link, tek kelimelik görünen ad ve en fazla üç artık kelime birlikteyse kısa kalıp düşürülür. Reklam ifadeli profil adları da bu sorguda değerlendirilir. En az sekiz Trakya konumunu virgülle sıralayan, reklam profili kelimesi, emoji ve bağlantı taşıyan yoğun konum listeleri ise kampanyanın başka sorgulardan kaçmaması için sorgudan bağımsız engellenir.
+Lüleburgaz sorgusunda gözlenen otomatik reklam kampanyası ayrıca birleşik sinyallerle süzülür. Uzun rakam dizili kullanıcı adı, konum, medya bağlantısı, tek kelimelik görünen ad ve kısa artık metin birlikteyse kısa kalıp düşürülür. `BİLGİ-PROFİLDE`, `İLETİŞİM-PROFİLDE` ve kısaltılmış yazımları gibi reklam profil adları URL bulunmasa da yoğun konum listesiyle beraber değerlendirilir. Yetişkin ilanlarında ise yalnızca yetişkin içerik sinyali ile `var mı`, `yazın`, `arıyorum`, `beklerim` gibi doğrudan çağrıların birleşimi engellenir; `aktif` gibi gündelik kullanımı olan sözcükler tek başına yeterli değildir.
 
 Haber kaynakları varsayılan olarak iki sitemap kullanır:
 

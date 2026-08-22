@@ -133,6 +133,7 @@ function reasonLabel(reasons) {
     "block_pattern:luleburgaz_short_link_campaign": "Kısa reklam kalıbı",
     "block_pattern:luleburgaz_ad_profile": "Reklam profili kalıbı",
     "block_pattern:luleburgaz_location_dump": "Toplu konum listesi",
+    "block_pattern:location_personal_solicitation": "Konumlu yetişkin ilanı",
   };
   return (reasons || [])
     .map((reason) =>
