@@ -375,6 +375,14 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
 
   const locationMentions = countLocationMentions(tweet.text, locationTerms);
   const nonLocationWordCount = countNonLocationWords(tweet.text, locationTerms);
+  const campaignLocationTerms = new Set([
+    ...locationTerms,
+    ...LULEBURGAZ_CAMPAIGN_LOCATION_TERMS,
+  ]);
+  const campaignLocationMentions = countLocationMentions(
+    tweet.text,
+    campaignLocationTerms,
+  );
   if (hasLink && locationMentions >= 3 && meaningfulLength <= 45) {
     reasons.push("block_pattern:location_word_soup_link");
   }
@@ -420,7 +428,7 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
   if (
     hasLink &&
     locationMentions >= 1 &&
-    locationHashtags.length >= 1 &&
+    (locationHashtags.length >= 1 || campaignLocationMentions >= 2) &&
     containsPictographicSymbol(tweet.text) &&
     looksLikeExpandedGeneratedCampaign
   ) {
@@ -439,14 +447,6 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
     reasons.push("block_pattern:trakya_location_word_campaign");
   }
 
-  const campaignLocationTerms = new Set([
-    ...locationTerms,
-    ...LULEBURGAZ_CAMPAIGN_LOCATION_TERMS,
-  ]);
-  const campaignLocationMentions = countLocationMentions(
-    tweet.text,
-    campaignLocationTerms,
-  );
   const profile = `${tweet.userHandle} ${tweet.userName}`.toLowerCase();
   const campaignText = tweet.text.toLowerCase();
   const comparableProfile = comparableName(profile);

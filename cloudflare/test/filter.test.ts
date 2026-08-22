@@ -201,26 +201,31 @@ describe("tweet filtering parity", () => {
   });
 
   it("drops the expanded generated-name word-salad campaign", () => {
-    const samples = [
-      tweet(
+    const samples: Array<[string, Tweet]> = [
+      ["Kırklareli", tweet(
         "Alexandriaqm5j",
         "Alexandria Fleming",
         "tuz ekmek hakkı 💐 keyfetme #kırklareli nite",
-      ),
-      tweet(
+      )],
+      ["Kırklareli", tweet(
         "LillianAndqww7",
         "Lillian Andrews",
         "lambası ikaz #kırklareli ☹ hırslanış başmakçı",
-      ),
-      tweet(
+      )],
+      ["Kırklareli", tweet(
         "Earnestinewfov",
         "Earnestine Dubray",
         "kravatlıca #kırklareli 🤨 nedeniyle soyluluk",
-      ),
+      )],
+      ["Lüleburgaz", tweet(
+        "SherylWeavt71z",
+        "Sheryl Weaver",
+        "yağ lüleburgaz yüreği tahripkâr ☹ katı çorlu ana",
+      )],
     ];
 
-    for (const item of samples) {
-      const reasons = evaluateTweetFilter(config, "Kırklareli", item);
+    for (const [query, item] of samples) {
+      const reasons = evaluateTweetFilter(config, query, item);
       expect(reasons, item.userHandle).toContain(
         "block_pattern:generated_name_location_link_campaign",
       );
