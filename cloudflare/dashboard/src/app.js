@@ -8,12 +8,14 @@ import {
   ExternalLink,
   Inbox,
   Newspaper,
+  Play,
   Radio,
   RefreshCw,
   Search,
   ShieldX,
   TriangleAlert,
   UsersRound,
+  X,
   createIcons,
 } from "lucide";
 import "./styles.css";
@@ -28,12 +30,14 @@ const icons = {
   ExternalLink,
   Inbox,
   Newspaper,
+  Play,
   Radio,
   RefreshCw,
   Search,
   ShieldX,
   TriangleAlert,
   UsersRound,
+  X,
 };
 
 const state = {
@@ -58,10 +62,34 @@ const elements = {
   search: document.querySelector("#feedSearch"),
   lastUpdated: document.querySelector("#lastUpdated"),
   statsFreshness: document.querySelector("#statsFreshness"),
+  mediaLightbox: document.querySelector("#mediaLightbox"),
+  lightboxImage: document.querySelector("#lightboxImage"),
+  lightboxVideo: document.querySelector("#lightboxVideo"),
+  lightboxMeta: document.querySelector("#lightboxMeta"),
+  lightboxLink: document.querySelector("#lightboxLink"),
+  lightboxClose: document.querySelector("#lightboxClose"),
 };
+
+let lightboxTrigger = null;
 
 function renderIcons() {
   createIcons({ icons });
+}
+
+function sizeInstagramPreview(image) {
+  const trigger = image.closest(".instagram-media-trigger");
+  const body = image.closest(".feed-item-body");
+  if (!trigger || !body || !image.naturalWidth || !image.naturalHeight) return;
+  const maxWidth = Math.min(420, body.clientWidth);
+  const maxHeight = window.matchMedia("(max-width: 720px)").matches
+    ? window.innerHeight * 0.58
+    : 420;
+  const aspectRatio = image.naturalWidth / image.naturalHeight;
+  trigger.style.width = `${Math.min(maxWidth, maxHeight * aspectRatio)}px`;
+}
+
+function sizeInstagramPreviews(root = document) {
+  root.querySelectorAll(".instagram-preview").forEach(sizeInstagramPreview);
 }
 
 function escapeHtml(value) {
@@ -192,7 +220,20 @@ function feedItemMarkup(item) {
           <div class="feed-identity"><strong>${escapeHtml(identity)}</strong><span>${escapeHtml(subline)}</span></div>
           <time class="feed-time" datetime="${escapeHtml(item.display_at)}" title="${escapeHtml(formatDate(item.display_at, true))}">${escapeHtml(relativeTime(item.display_at))}</time>
         </div>
-        ${isInstagram && item.preview_url ? `<img class="instagram-preview" src="${escapeHtml(item.preview_url)}" alt="@${escapeHtml(item.user_handle)} Instagram önizlemesi" loading="lazy" />` : ""}
+        ${isInstagram && item.preview_url ? `
+          <button
+            class="instagram-media-trigger"
+            type="button"
+            data-preview-url="${escapeHtml(item.preview_url)}"
+            data-media-url="${escapeHtml(item.media_url || "")}"
+            data-instagram-link="${escapeHtml(item.link)}"
+            data-instagram-user="${escapeHtml(item.user_handle)}"
+            title="Medyayı büyüt"
+            aria-label="@${escapeHtml(item.user_handle)} medyasını büyüt"
+          >
+            <img class="instagram-preview" src="${escapeHtml(item.preview_url)}" alt="@${escapeHtml(item.user_handle)} Instagram önizlemesi" loading="lazy" />
+            ${item.media_url ? '<span class="media-play-indicator" aria-hidden="true"><i data-lucide="play"></i></span>' : ""}
+          </button>` : ""}
         <p class="feed-copy${longCopy ? " is-collapsed" : ""}">${escapeHtml(copy)}</p>
         ${longCopy ? '<button class="expand-button" type="button">Devamını göster</button>' : ""}
         <div class="feed-item-footer">
@@ -225,6 +266,51 @@ function renderFeed() {
   elements.loadMore.disabled = state.loading;
   elements.loadMore.textContent = state.loading ? "Yükleniyor" : "Daha fazla göster";
   renderIcons();
+  requestAnimationFrame(() => sizeInstagramPreviews(elements.feedList));
+}
+
+function showLightboxImage() {
+  elements.lightboxVideo.pause();
+  elements.lightboxVideo.removeAttribute("src");
+  elements.lightboxVideo.load();
+  elements.lightboxVideo.hidden = true;
+  elements.lightboxImage.hidden = false;
+}
+
+function openMediaLightbox(trigger) {
+  const { previewUrl, mediaUrl, instagramLink, instagramUser } = trigger.dataset;
+  if (!previewUrl) return;
+  lightboxTrigger = trigger;
+  elements.lightboxImage.src = previewUrl;
+  elements.lightboxImage.alt = `@${instagramUser} Instagram medyası`;
+  elements.lightboxMeta.textContent = `@${instagramUser}`;
+  elements.lightboxLink.href = instagramLink;
+  elements.mediaLightbox.hidden = false;
+  document.body.classList.add("lightbox-open");
+
+  if (mediaUrl) {
+    elements.lightboxImage.hidden = true;
+    elements.lightboxVideo.poster = previewUrl;
+    elements.lightboxVideo.src = mediaUrl;
+    elements.lightboxVideo.hidden = false;
+    elements.lightboxVideo.play().catch(() => {});
+  } else {
+    showLightboxImage();
+  }
+  elements.lightboxClose.focus();
+}
+
+function closeMediaLightbox() {
+  if (elements.mediaLightbox.hidden) return;
+  elements.mediaLightbox.hidden = true;
+  document.body.classList.remove("lightbox-open");
+  elements.lightboxImage.removeAttribute("src");
+  elements.lightboxVideo.pause();
+  elements.lightboxVideo.removeAttribute("src");
+  elements.lightboxVideo.removeAttribute("poster");
+  elements.lightboxVideo.load();
+  lightboxTrigger?.focus();
+  lightboxTrigger = null;
 }
 
 function prependFeedItems(items) {
@@ -233,6 +319,7 @@ function prependFeedItems(items) {
   elements.feedEmpty.hidden = true;
   elements.feedSummary.textContent = `${formatNumber(state.items.length)} kayıt gösteriliyor`;
   renderIcons();
+  requestAnimationFrame(() => sizeInstagramPreviews(elements.feedList));
 }
 
 async function fetchFeed({ append = false, poll = false } = {}) {
@@ -425,11 +512,35 @@ elements.newItems.addEventListener("click", () => {
 });
 
 elements.feedList.addEventListener("click", (event) => {
+  const mediaTrigger = event.target.closest(".instagram-media-trigger");
+  if (mediaTrigger) {
+    openMediaLightbox(mediaTrigger);
+    return;
+  }
   const button = event.target.closest(".expand-button");
   if (!button) return;
   const copy = button.previousElementSibling;
   copy.classList.toggle("is-collapsed");
   button.textContent = copy.classList.contains("is-collapsed") ? "Devamını göster" : "Daha az göster";
+});
+
+elements.feedList.addEventListener("load", (event) => {
+  if (event.target.matches?.(".instagram-preview")) sizeInstagramPreview(event.target);
+}, true);
+
+let resizeFrame = null;
+window.addEventListener("resize", () => {
+  if (resizeFrame) cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(() => sizeInstagramPreviews(elements.feedList));
+});
+
+elements.lightboxVideo.addEventListener("error", showLightboxImage);
+elements.lightboxClose.addEventListener("click", closeMediaLightbox);
+elements.mediaLightbox.addEventListener("click", (event) => {
+  if (event.target === elements.mediaLightbox) closeMediaLightbox();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeMediaLightbox();
 });
 
 document.querySelectorAll("[data-mobile-view]").forEach((button) => {

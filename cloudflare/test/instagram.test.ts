@@ -10,6 +10,7 @@ const payload = {
   link: "https://www.instagram.com/reel/ABC123/",
   created_at: "2026-07-23T12:00:00+00:00",
   preview_url: "https://scontent.cdninstagram.com/cover.jpg",
+  media_url: "https://scontent.cdninstagram.com/video.mp4",
 };
 
 describe("Instagram ingest helpers", () => {

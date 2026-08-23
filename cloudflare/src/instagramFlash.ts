@@ -151,6 +151,15 @@ function candidateUrl(record: JsonRecord): string {
   );
 }
 
+function candidateVideoUrl(record: JsonRecord): string {
+  const videoVersions = Array.isArray(record.video_versions) ? record.video_versions : [];
+  return firstString(
+    record.video_url,
+    nested(videoVersions[0], "url"),
+    nested(record, "video_versions", "0", "url"),
+  );
+}
+
 function safePreviewUrl(value: string): string | null {
   if (!value) return null;
   try {
@@ -176,6 +185,15 @@ function contentTypeOf(record: JsonRecord): InstagramPayload["content_type"] {
   }
   if (productType.includes("clip") || productType.includes("reel")) return "reel";
   return "post";
+}
+
+function isVideoRecord(record: JsonRecord): boolean {
+  const typename = cleanString(record.__typename).toLowerCase();
+  const productType = cleanString(record.product_type).toLowerCase();
+  return Number(record.media_type || 0) === 2 ||
+    typename.includes("video") ||
+    productType.includes("clip") ||
+    productType.includes("reel");
 }
 
 function normalizeMedia(
@@ -215,6 +233,7 @@ function normalizeMedia(
       link,
       created_at: timestamp.iso,
       preview_url: safePreviewUrl(candidateUrl(record)),
+      media_url: isVideoRecord(record) ? safePreviewUrl(candidateVideoUrl(record)) : null,
     },
     sortTimestamp: timestamp.milliseconds,
   };

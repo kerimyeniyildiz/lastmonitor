@@ -63,6 +63,7 @@ describe("FlashAPI Instagram support", () => {
             caption_text: "Yeni video",
             taken_at: 1_787_400_100,
             thumbnail_url: "https://scontent.fbcdn.net/reel.jpg",
+            video_versions: [{ url: "https://scontent.fbcdn.net/reel.mp4" }],
           },
         ],
       },
@@ -82,6 +83,7 @@ describe("FlashAPI Instagram support", () => {
       event_key: "instagram:rozmedyahaber:feed:REEL2",
       content_type: "reel",
       link: "https://www.instagram.com/p/REEL2/",
+      media_url: "https://scontent.fbcdn.net/reel.mp4",
     });
   });
 

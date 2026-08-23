@@ -18,6 +18,7 @@ export interface InstagramPayload {
   link: string;
   created_at: string | null;
   preview_url: string | null;
+  media_url: string | null;
 }
 
 interface InstagramRow {
@@ -43,21 +44,21 @@ function cleanText(value: unknown, maximum: number): string {
   return typeof value === "string" ? value.trim().slice(0, maximum) : "";
 }
 
-function parseInstagramPreviewUrl(value: unknown): string | null {
-  const previewUrl = cleanText(value, 4000);
-  if (!previewUrl) return null;
+function parseInstagramCdnUrl(value: unknown, fieldName: string): string | null {
+  const mediaUrl = cleanText(value, 4000);
+  if (!mediaUrl) return null;
   let parsed: URL;
   try {
-    parsed = new URL(previewUrl);
+    parsed = new URL(mediaUrl);
   } catch {
-    throw new Error("Invalid preview_url");
+    throw new Error(`Invalid ${fieldName}`);
   }
   const hostname = parsed.hostname.toLowerCase();
   const allowed = hostname === "instagram.com" ||
     hostname.endsWith(".instagram.com") ||
     PREVIEW_HOST_SUFFIXES.some((suffix) => hostname.endsWith(suffix));
   if (parsed.protocol !== "https:" || !allowed) {
-    throw new Error("preview_url must use an Instagram CDN");
+    throw new Error(`${fieldName} must use an Instagram CDN`);
   }
   return parsed.toString();
 }
@@ -72,7 +73,8 @@ export function validateInstagramPayload(value: unknown): InstagramPayload {
   const caption = cleanText(raw.caption, 2200);
   const link = cleanText(raw.link, 1000);
   const createdAt = cleanText(raw.created_at, 80) || null;
-  const previewUrl = parseInstagramPreviewUrl(raw.preview_url);
+  const previewUrl = parseInstagramCdnUrl(raw.preview_url, "preview_url");
+  const mediaUrl = parseInstagramCdnUrl(raw.media_url, "media_url");
 
   if (!eventKey || !/^[A-Za-z0-9:._-]+$/.test(eventKey)) {
     throw new Error("Invalid event_key");
@@ -102,6 +104,7 @@ export function validateInstagramPayload(value: unknown): InstagramPayload {
     link: parsedLink.toString(),
     created_at: createdAt,
     preview_url: previewUrl,
+    media_url: mediaUrl,
   };
 }
 
@@ -139,12 +142,13 @@ export async function storeInstagramPayload(
     .prepare(
       `INSERT INTO instagram_events (
          event_key, instagram_id, username, content_type, caption, link,
-         preview_url, content_created_at, delivery_status, telegram_status, fetched_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+         preview_url, media_url, content_created_at, delivery_status, telegram_status, fetched_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(event_key) DO UPDATE SET
          caption = excluded.caption,
          link = excluded.link,
          preview_url = COALESCE(excluded.preview_url, instagram_events.preview_url),
+         media_url = COALESCE(excluded.media_url, instagram_events.media_url),
          content_created_at = COALESCE(excluded.content_created_at, instagram_events.content_created_at),
          fetched_at = CURRENT_TIMESTAMP`,
     )
@@ -156,6 +160,7 @@ export async function storeInstagramPayload(
       payload.caption || null,
       payload.link,
       payload.preview_url,
+      payload.media_url,
       payload.created_at,
       seed ? "seeded" : "pending",
       seed ? "seeded" : "pending",
