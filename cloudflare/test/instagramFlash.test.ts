@@ -3,6 +3,7 @@ import {
   extractFlashUserId,
   isInstagramShiftActive,
   normalizeFlashInstagram,
+  parseFlashJson,
 } from "../src/instagramFlash";
 import type { AppConfig } from "../src/types";
 
@@ -79,7 +80,20 @@ describe("FlashAPI Instagram support", () => {
     expect(result[1]).toMatchObject({
       event_key: "instagram:rozmedyahaber:feed:REEL2",
       content_type: "reel",
-      link: "https://www.instagram.com/reel/REEL2/",
+      link: "https://www.instagram.com/p/REEL2/",
+    });
+  });
+
+  it("preserves story ids beyond JavaScript's safe integer range", () => {
+    const value = parseFlashJson(
+      '{"items":[{"pk":3969497835019712179,"media_type":1,"taken_at":1787400200}]}',
+    );
+    const result = normalizeFlashInstagram(value, "rozmedyahaber", "story");
+
+    expect(result[0]).toMatchObject({
+      event_key: "instagram:rozmedyahaber:story:3969497835019712179",
+      instagram_id: "3969497835019712179",
+      link: "https://www.instagram.com/stories/rozmedyahaber/3969497835019712179/",
     });
   });
 

@@ -29,9 +29,9 @@ describe("Instagram ingest helpers", () => {
     ).toThrow("Instagram CDN");
   });
 
-  it("builds compact reel notifications without video data", () => {
+  it("labels every feed media type as an Instagram post", () => {
     expect(buildInstagramMessage(payload)).toBe(
-      "Instagram Reels\n" +
+      "Instagram Gönderi\n" +
       "Hesap: @rozmedyahaber\n" +
       "Açıklama: Yeni haber\n" +
       "Bağlantı: https://www.instagram.com/reel/ABC123/",

@@ -1,3 +1,4 @@
+import JSONbig from "json-bigint";
 import { claimSchedule, recordRun } from "./database";
 import { storeInstagramPayload, type InstagramPayload } from "./instagram";
 import type { AppConfig, Env, RunSummary } from "./types";
@@ -21,6 +22,11 @@ const MEDIA_SIGNALS = [
   "thumbnail_url",
   "video_versions",
 ];
+const flashJson = JSONbig({
+  storeAsString: true,
+  protoAction: "error",
+  constructorAction: "error",
+});
 
 type JsonRecord = Record<string, unknown>;
 type InstagramGroup = "feed" | "story";
@@ -28,6 +34,10 @@ type InstagramGroup = "feed" | "story";
 interface NormalizedPayload {
   payload: InstagramPayload;
   sortTimestamp: number;
+}
+
+export function parseFlashJson(text: string): unknown {
+  return flashJson.parse(text);
 }
 
 function asRecord(value: unknown): JsonRecord | null {
@@ -184,11 +194,10 @@ function normalizeMedia(
     record.date,
   ));
   const contentType = group === "story" ? "story" : contentTypeOf(record);
-  const route = contentType === "reel" ? "reel" : "p";
   const link = group === "story"
     ? `https://www.instagram.com/stories/${username}/${instagramId}/`
     : code
-      ? `https://www.instagram.com/${route}/${code}/`
+      ? `https://www.instagram.com/p/${code}/`
       : `https://www.instagram.com/${username}/`;
 
   return {
@@ -314,7 +323,7 @@ class FlashApiClient {
     }
     let value: unknown;
     try {
-      value = JSON.parse(text);
+      value = parseFlashJson(text);
     } catch {
       throw new Error(`FlashAPI returned invalid JSON: ${text.slice(0, 200)}`);
     }

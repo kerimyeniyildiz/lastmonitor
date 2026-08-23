@@ -164,8 +164,8 @@ function feedItemMarkup(item) {
     : item.user_name || item.user_handle || (isInstagram ? "Instagram hesabı" : "X kullanıcısı");
   const instagramLabels = {
     post: "Gönderi",
-    carousel: "Çoklu gönderi",
-    reel: "Reels",
+    carousel: "Gönderi",
+    reel: "Gönderi",
     story: "Story",
   };
   const subline = isNews

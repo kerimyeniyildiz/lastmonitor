@@ -108,8 +108,8 @@ export function validateInstagramPayload(value: unknown): InstagramPayload {
 export function buildInstagramMessage(payload: InstagramPayload): string {
   const labels: Record<InstagramPayload["content_type"], string> = {
     post: "Gönderi",
-    carousel: "Çoklu Gönderi",
-    reel: "Reels",
+    carousel: "Gönderi",
+    reel: "Gönderi",
     story: "Story",
   };
   const lines = [
