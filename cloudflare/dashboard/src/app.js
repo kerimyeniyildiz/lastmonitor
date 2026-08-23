@@ -537,7 +537,9 @@ window.addEventListener("resize", () => {
 elements.lightboxVideo.addEventListener("error", showLightboxImage);
 elements.lightboxClose.addEventListener("click", closeMediaLightbox);
 elements.mediaLightbox.addEventListener("click", (event) => {
-  if (event.target === elements.mediaLightbox) closeMediaLightbox();
+  if (!event.target.closest(".lightbox-media, .lightbox-footer, .lightbox-close")) {
+    closeMediaLightbox();
+  }
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeMediaLightbox();
