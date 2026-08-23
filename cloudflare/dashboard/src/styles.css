@@ -280,6 +280,7 @@ body.lightbox-open { overflow: hidden; }
 .feed-copy.is-collapsed { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 5; }
 .expand-button { margin-top: 6px; padding: 0; color: #176f66; background: none; border: 0; font-size: 10px; font-weight: 750; cursor: pointer; }
 .feed-item-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.feed-item-footer.link-only { justify-content: flex-end; }
 .source-badge { max-width: 60%; overflow: hidden; padding: 3px 6px; color: #66737a; background: #f0f3f4; border-radius: 4px; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .source-badge.danger-badge { color: #983737; background: var(--red-soft); }
 .external-link { display: inline-flex; align-items: center; gap: 5px; color: #176f66; font-size: 10px; font-weight: 750; text-decoration: none; white-space: nowrap; }

@@ -206,13 +206,9 @@ function feedItemMarkup(item) {
     : item.text || (isInstagram ? "Yeni Instagram içeriği" : "");
   const newsDescription = isNews ? String(item.description || "").trim() : "";
   const longCopy = copy.length > 360;
-  const badge = filtered
+  const filterBadge = filtered
     ? reasonLabel(item.filter_reasons) || "Filtrelendi"
-    : isNews
-      ? item.source
-      : isInstagram
-        ? instagramLabels[item.content_type] || "Instagram"
-        : item.query;
+    : "";
   return `
     <article class="feed-item ${itemClass}" data-key="${escapeHtml(itemKey(item))}">
       <span class="feed-type-icon"><i data-lucide="${icon}"></i></span>
@@ -238,8 +234,8 @@ function feedItemMarkup(item) {
         <p class="feed-copy${longCopy ? " is-collapsed" : ""}">${escapeHtml(copy)}</p>
         ${newsDescription ? `<p class="news-description">${escapeHtml(newsDescription)}</p>` : ""}
         ${longCopy ? '<button class="expand-button" type="button">Devamını göster</button>' : ""}
-        <div class="feed-item-footer">
-          <span class="source-badge${filtered ? " danger-badge" : ""}">${escapeHtml(badge || (isNews ? "Haber" : "Tweet"))}</span>
+        <div class="feed-item-footer${filtered ? "" : " link-only"}">
+          ${filtered ? `<span class="source-badge danger-badge">${escapeHtml(filterBadge)}</span>` : ""}
           <a class="external-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">
             ${isNews ? "Haberi aç" : isInstagram ? "Instagram'da aç" : "X'te aç"}<i data-lucide="external-link"></i>
           </a>
