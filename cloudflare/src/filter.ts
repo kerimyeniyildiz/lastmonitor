@@ -7,6 +7,7 @@ export const DROPPABLE_FILTER_REASONS = new Set([
   "block_pattern:suspicious_location_link",
   "block_pattern:generated_location_link_campaign",
   "block_pattern:generated_name_location_link_campaign",
+  "block_pattern:synthetic_location_word_salad",
   "block_pattern:trakya_location_word_campaign",
   "block_pattern:trakya_location_dump_ad_campaign",
   "block_pattern:luleburgaz_short_link_campaign",
@@ -59,6 +60,9 @@ const PERSONAL_ADULT_TERMS = [
   "vajinal",
   "orgazm",
   "ensest",
+  "azgin",
+  "sikli",
+  "yalayabilecegim",
 ];
 const STRONG_PERSONAL_ADULT_TERMS = [
   "seks",
@@ -69,6 +73,9 @@ const STRONG_PERSONAL_ADULT_TERMS = [
   "vajinal",
   "orgazm",
   "ensest",
+  "azgin",
+  "sikli",
+  "yalayabilecegim",
 ];
 const PERSONAL_SOLICITATION_PHRASES = [
   "varmi",
@@ -89,6 +96,31 @@ const TRAKYA_LOCATION_CAMPAIGN_TERMS = [
   "kapıkule",
   "kapikule",
 ];
+const NATURAL_SHORT_POST_WORDS = new Set([
+  "ama",
+  "bir",
+  "biz",
+  "bu",
+  "bugun",
+  "cok",
+  "da",
+  "daha",
+  "de",
+  "gibi",
+  "icin",
+  "ile",
+  "mi",
+  "ne",
+  "olan",
+  "olarak",
+  "once",
+  "sen",
+  "sonra",
+  "var",
+  "ve",
+  "yarin",
+  "yok",
+]);
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -278,6 +310,23 @@ function looksLikeSymbolOnlyDisplayName(name: string): boolean {
   return cleaned.length > 0 && !/[\p{L}\p{N}]/u.test(cleaned);
 }
 
+function looksLikeSyntheticSingleNameProfile(handle: string, displayName: string): boolean {
+  const rawHandle = handle.trim();
+  const rawName = displayName.trim();
+  if (!/^[A-Za-z0-9]{5,16}$/.test(rawHandle)) return false;
+
+  const normalizedHandle = comparableName(rawHandle);
+  const normalizedName = comparableName(rawName);
+  if (!normalizedName) {
+    return /^[\p{L}\s]+$/u.test(rawName) && normalizedHandle.length <= 10;
+  }
+  if (!/^\p{L}+$/u.test(rawName)) return false;
+  if (!normalizedHandle.startsWith(normalizedName)) return false;
+
+  const suffixLength = normalizedHandle.length - normalizedName.length;
+  return suffixLength >= 2 && suffixLength <= 7;
+}
+
 function normalizedWordCounts(value: string): Map<string, number> {
   const words = value
     .normalize("NFKD")
@@ -308,7 +357,7 @@ function hasRepeatedLocationVariant(text: string, locationTerms: Set<string>): b
   return mentioned.length >= 2 && mentioned.some((term) => (counts.get(term) ?? 0) >= 2);
 }
 
-function countNonLocationWords(text: string, locationTerms: Set<string>): number {
+function nonLocationWords(text: string, locationTerms: Set<string>): string[] {
   let remaining = text.replace(/https?:\/\/\S+/giu, " ").replace(/@\S+/gu, " ");
   const sortedTerms = [...locationTerms].sort((left, right) => right.length - left.length);
   for (const term of sortedTerms) {
@@ -319,7 +368,13 @@ function countNonLocationWords(text: string, locationTerms: Set<string>): number
     );
     remaining = remaining.replace(pattern, " ");
   }
-  return remaining.match(/\p{L}+/gu)?.length ?? 0;
+  return (remaining.match(/\p{L}+/gu) ?? [])
+    .map(comparableName)
+    .filter(Boolean);
+}
+
+function countNonLocationWords(text: string, locationTerms: Set<string>): number {
+  return nonLocationWords(text, locationTerms).length;
 }
 
 function queryBypassesFilter(config: AppConfig, query: string): boolean {
@@ -374,7 +429,8 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
   }
 
   const locationMentions = countLocationMentions(tweet.text, locationTerms);
-  const nonLocationWordCount = countNonLocationWords(tweet.text, locationTerms);
+  const remainingWords = nonLocationWords(tweet.text, locationTerms);
+  const nonLocationWordCount = remainingWords.length;
   const campaignLocationTerms = new Set([
     ...locationTerms,
     ...LULEBURGAZ_CAMPAIGN_LOCATION_TERMS,
@@ -413,6 +469,18 @@ export function evaluateTweetFilter(config: AppConfig, query: string, tweet: Twe
     looksLikeGeneratedNameHandle(tweet.userHandle, tweet.userName)
   ) {
     reasons.push("block_pattern:generated_name_location_link_campaign");
+  }
+  if (
+    /https:\/\/t\.co\/\S+/iu.test(tweet.text) &&
+    locationHashtags.length >= 1 &&
+    nonLocationWordCount >= 3 &&
+    nonLocationWordCount <= 5 &&
+    containsPictographicSymbol(tweet.text) &&
+    !/@[A-Za-z0-9_]+/u.test(tweet.text) &&
+    !remainingWords.some((word) => NATURAL_SHORT_POST_WORDS.has(word)) &&
+    looksLikeSyntheticSingleNameProfile(tweet.userHandle, tweet.userName)
+  ) {
+    reasons.push("block_pattern:synthetic_location_word_salad");
   }
   const looksLikeExpandedGeneratedCampaign =
     (

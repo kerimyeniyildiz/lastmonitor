@@ -32,6 +32,18 @@ export const DEFAULT_BLOCKED_TWEET_HANDLES = [
   "PatrickJenffpg",
   "TolgaOzcel5sz",
   "BeatrizBoo28653",
+  "wgvut",
+  "HUDAwtva",
+  "Aaa9bf",
+  "taahrzdeh",
+  "ABDALLH27zy",
+  "Amjad1th9",
+  "A7slce",
+  "xzgszm",
+  "kedy543716",
+  "qb6del",
+  "Zeynep1041817",
+  "editorerdemir",
 ];
 
 export const DEFAULT_WATCH_TWEET_TERMS = [

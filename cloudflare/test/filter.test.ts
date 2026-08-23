@@ -363,6 +363,67 @@ describe("tweet filtering parity", () => {
     }
   });
 
+  it("drops the synthetic single-name location word-salad campaign", () => {
+    const samples = [
+      tweet("wgvut", "علي المجيدي", "yarım #kırklareli 🐢 seren hışım mahşerleşmek"),
+      tweet("qb6del", "فؤاد ناصر أحمد الخلقي", "☹ mediyasten #kırklareli mut Balkar"),
+      tweet("HUDAwtva", "HUDA", "defnolunma doldurtabilme #kırklareli buyrukluk 🤬 başına"),
+      tweet("Aaa9bf", "Aa", "ballanma #kırklareli önemseyiş ☹ fıskiye"),
+      tweet("taahrzdeh", "taahr", "tanker pitsikato destursuz 🍉 #kırklareli"),
+      tweet("ABDALLH27zy", "ABDALLH", "öfkeli muta 💖 #kırklareli çöğünme"),
+      tweet("Amjad1th9", "Amjad", "türap menopoz 🐆 #kırklareli işçilik"),
+      tweet("A7slce", "A", "#kırklareli çatallanma 🌾 onkolojik ensest"),
+      tweet("xzgszm", "العباد", "rubaimsi 🕊 hidrobiyolojik #kırklareli etimoloji"),
+    ];
+
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(
+        { ...config, blockedTweetHandles: [] },
+        "Kırklareli",
+        item,
+      );
+      expect(reasons, item.userHandle).toContain("block_pattern:synthetic_location_word_salad");
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
+  });
+
+  it("keeps coherent short posts from generated-looking profiles", () => {
+    const samples = [
+      tweet("Selin123", "Selin", "Bugün #kırklareli hava çok güzel 🥰"),
+      tweet("wgvut", "علي المجيدي", "Bugün #kırklareli hava çok güzel 🥰"),
+      tweet("Aaa9bf", "Aa", "Bu akşam #kırklareli konseri var 🎶"),
+    ];
+
+    for (const item of samples) {
+      const reasons = evaluateTweetFilter(
+        { ...config, blockedTweetHandles: [] },
+        "Kırklareli",
+        item,
+      );
+      expect(reasons).not.toContain("block_pattern:synthetic_location_word_salad");
+      expect(shouldDropTweet(reasons)).toBe(false);
+    }
+  });
+
+  it("drops explicit location solicitations without blocking active-life posts", () => {
+    const solicitation = tweet(
+      "kedy543716",
+      "cen",
+      "Lüleburgaz aktifler yazsın azgınım büyük sikli yok mu yalayabileceğim 😏😋 #lüleburgaz #kırklareli #çorlu",
+    );
+    solicitation.text = solicitation.text.replace(/ https:\/\/t\.co\/example$/, "");
+    const activeLife = tweet(
+      "KirklareliSpor",
+      "Kırklareli Spor",
+      "Kırklareli'de aktif yaşam için spor etkinliği düzenlendi 🏃",
+    );
+
+    const solicitationReasons = evaluateTweetFilter(config, "Kırklareli", solicitation);
+    expect(solicitationReasons).toContain("block_pattern:location_personal_solicitation");
+    expect(shouldDropTweet(solicitationReasons)).toBe(true);
+    expect(shouldDropTweet(evaluateTweetFilter(config, "Kırklareli", activeLife))).toBe(false);
+  });
+
   it("blocks explicitly confirmed spam handles case-insensitively", () => {
     const item = tweet(
       "BeatrizBoo28653",
@@ -373,6 +434,33 @@ describe("tweet filtering parity", () => {
 
     expect(reasons).toContain("blocked_handle:beatrizboo28653");
     expect(shouldDropTweet(reasons)).toBe(true);
+  });
+
+  it("blocks the latest confirmed spam handles without relying on content", () => {
+    const handles = [
+      "wgvut",
+      "HUDAwtva",
+      "Aaa9bf",
+      "taahrzdeh",
+      "ABDALLH27zy",
+      "Amjad1th9",
+      "A7slce",
+      "xzgszm",
+      "kedy543716",
+      "qb6del",
+      "Zeynep1041817",
+      "editorerdemir",
+    ];
+
+    for (const handle of handles) {
+      const reasons = evaluateTweetFilter(
+        config,
+        "Kırklareli",
+        tweet(handle.toUpperCase(), "Normal görünen ad", "Kırklareli hakkında sıradan metin"),
+      );
+      expect(reasons, handle).toContain(`blocked_handle:${handle.toLowerCase()}`);
+      expect(shouldDropTweet(reasons)).toBe(true);
+    }
   });
 
   it("drops generated name handles only with the full short campaign pattern", () => {
