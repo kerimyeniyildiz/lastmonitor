@@ -102,14 +102,33 @@ SITEMAP_MONTH_LOOKBACK=1
 
 `SITEMAP_MONTHLY_TEMPLATES` içindeki `{YYYY}` ve `{MM}` alanları otomatik doldurulur. `SITEMAP_MONTH_LOOKBACK=1` ay başlarında önceki ayın sitemap'ini de kontrol eder. Eski uzaktan liste dosyası akışı gerekiyorsa `SITEMAP_LIST_URL` tanımlanabilir; doğrudan sitemap ayarları varsa öncelik onlardadır.
 
-## Yerel Instagram Worker
+## Cloudflare Instagram İzleyicisi
 
-Yeni Instagram izleyicisi Cloudflare cron içinde çalışmaz. Instagram oturumu ve Android
-cihaz kimliği yalnızca Mac'te tutulur; normalize edilen yeni içerikler kimlik doğrulamalı
-Cloudflare ingest endpointine gönderilir. Cloudflare metaveriyi D1'e kaydeder, Instagram
-CDN önizleme bağlantısını doğrudan kullanır, Telegram bildirimini gönderir ve dashboard
-akışına ekler. Görseller indirilmez veya R2'ye kopyalanmaz; CDN bağlantısı süresi dolduğunda
-eski dashboard önizlemesi artık açılmayabilir.
+Üretimdeki Instagram izleyicisi Cloudflare Cron içinde çalışır ve FlashAPI üzerinden
+yalnızca herkese açık hesapları kontrol eder. Varsayılan hedefler `rozmedyahaber` ile
+`kirklareli_gundem`; gönderiler ve story'ler hedef başına 30 dakikada bir taranır.
+Takip için Instagram kullanıcı adı, şifresi, session veya yerel bilgisayar gerekmez.
+
+İzleyici `2026-08-24 08:00 Europe/Istanbul` başlangıcından itibaren 48 saatlik döngünün
+ilk 18 saatinde çalışır. Böylece 24 Ağustos 08:00-25 Ağustos 02:00 çalışma penceresinden
+sonra 30 saat bekler ve 26 Ağustos 08:00'de yeniden başlar. İlk başarılı kontrolde bulunan
+mevcut içerikler `seeded` olarak D1'e kaydedilir ve Telegram'a topluca gönderilmez. Sonraki
+kontrollerde yalnızca yeni içerikler ortak Instagram teslimat hattından Telegram'a ve
+dashboard canlı akışına eklenir.
+
+```env
+INSTAGRAM_FLASH_ENABLED=true
+INSTAGRAM_FLASH_TARGETS=rozmedyahaber,kirklareli_gundem
+INSTAGRAM_FLASH_INTERVAL_SECONDS=1800
+INSTAGRAM_SHIFT_ANCHOR=2026-08-24T08:00:00+03:00
+INSTAGRAM_SHIFT_WORK_HOURS=18
+INSTAGRAM_SHIFT_CYCLE_HOURS=48
+```
+
+FlashAPI aynı RapidAPI hesabındaki `RAPIDAPI_KEY` secret'ını kullanır. Kullanıcı kimlikleri
+D1'de önbelleğe alındıktan sonra her hedef ve kontrol için bir gönderi, bir story isteği
+yapılır. Görseller indirilmez veya R2'ye kopyalanmaz; Instagram CDN önizleme bağlantıları
+doğrudan kullanıldığı için süresi dolan eski dashboard görselleri artık açılmayabilir.
 
 Bildirim medya kuralları:
 
@@ -117,6 +136,14 @@ Bildirim medya kuralları:
 - Carousel: yalnızca ilk görsel, açıklama ve bağlantı
 - Reels: yalnızca kapak görseli, açıklama ve bağlantı
 - Fotoğraf veya video story: yalnızca kapak/önizleme ve bağlantı
+
+## Eski Yerel Instagram Worker
+
+`instagram_worker/` dizini önceki `instagrapi` tabanlı Mac uygulamasını korur ancak
+üretimde kullanılmaz ve otomatik başlamaz. Aşağıdaki bilgiler yalnızca yedek yöntemin
+yeniden denenmesi gerekirse geçerlidir. Yerel worker normalize ettiği içerikleri
+kimlik doğrulamalı Cloudflare ingest endpointine gönderir; ortak teslimat hattı D1,
+Telegram ve dashboard işlemlerini yapar.
 
 Kurulum:
 

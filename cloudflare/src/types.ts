@@ -22,6 +22,12 @@ export interface Env {
   SITEMAP_URLS?: string;
   SITEMAP_MONTHLY_TEMPLATES?: string;
   SITEMAP_MONTH_LOOKBACK?: string;
+  INSTAGRAM_FLASH_ENABLED?: string;
+  INSTAGRAM_FLASH_TARGETS?: string;
+  INSTAGRAM_FLASH_INTERVAL_SECONDS?: string;
+  INSTAGRAM_SHIFT_ANCHOR?: string;
+  INSTAGRAM_SHIFT_WORK_HOURS?: string;
+  INSTAGRAM_SHIFT_CYCLE_HOURS?: string;
   API_REQUIRE_TOKEN?: string;
 }
 
@@ -48,6 +54,12 @@ export interface AppConfig {
   sitemapUrls: string[];
   sitemapMonthlyTemplates: string[];
   sitemapMonthLookback: number;
+  instagramFlashEnabled: boolean;
+  instagramFlashTargets: string[];
+  instagramFlashIntervalSeconds: number;
+  instagramShiftAnchor: string;
+  instagramShiftWorkHours: number;
+  instagramShiftCycleHours: number;
 }
 
 export interface Tweet {

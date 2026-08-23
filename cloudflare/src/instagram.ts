@@ -1,5 +1,5 @@
 import { recordRun } from "./database";
-import { sendTelegram, sendTelegramPhoto } from "./monitor";
+import { sendTelegram, sendTelegramPhoto } from "./telegram";
 import type { Env, RunSummary } from "./types";
 
 const JSON_HEADERS = {
@@ -7,7 +7,7 @@ const JSON_HEADERS = {
   "cache-control": "no-store",
 };
 const CONTENT_TYPES = new Set(["post", "carousel", "reel", "story"]);
-const PREVIEW_HOST_SUFFIXES = [".cdninstagram.com", ".fbcdn.net"];
+const PREVIEW_HOST_SUFFIXES = [".cdninstagram.com", ".fbcdn.net", ".fbsbx.com"];
 
 export interface InstagramPayload {
   event_key: string;
@@ -23,6 +23,11 @@ export interface InstagramPayload {
 interface InstagramRow {
   event_key: string;
   telegram_status: string;
+}
+
+export interface InstagramDeliveryResult {
+  duplicate: boolean;
+  telegramStatus: "seeded" | "sent";
 }
 
 function json(value: unknown, status = 200): Response {
@@ -116,16 +121,12 @@ export function buildInstagramMessage(payload: InstagramPayload): string {
   return lines.join("\n");
 }
 
-export async function ingestInstagramEvent(request: Request, env: Env): Promise<Response> {
-  if (!isAuthorized(request, env)) return json({ detail: "Unauthorized" }, 401);
-
-  let payload: InstagramPayload;
-  try {
-    payload = validateInstagramPayload(await request.json());
-  } catch (error) {
-    return json({ detail: error instanceof Error ? error.message : "Invalid payload" }, 400);
-  }
-
+export async function storeInstagramPayload(
+  env: Env,
+  value: unknown,
+  seed = false,
+): Promise<InstagramDeliveryResult> {
+  const payload = validateInstagramPayload(value);
   const existing = await env.DB
     .prepare(
       `SELECT event_key, telegram_status
@@ -139,7 +140,7 @@ export async function ingestInstagramEvent(request: Request, env: Env): Promise<
       `INSERT INTO instagram_events (
          event_key, instagram_id, username, content_type, caption, link,
          preview_url, content_created_at, delivery_status, telegram_status, fetched_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', CURRENT_TIMESTAMP)
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
        ON CONFLICT(event_key) DO UPDATE SET
          caption = excluded.caption,
          link = excluded.link,
@@ -156,11 +157,22 @@ export async function ingestInstagramEvent(request: Request, env: Env): Promise<
       payload.link,
       payload.preview_url,
       payload.created_at,
+      seed ? "seeded" : "pending",
+      seed ? "seeded" : "pending",
     )
     .run();
 
-  if (existing?.telegram_status === "sent") {
-    return json({ status: "ok", duplicate: true, telegram_status: "sent" });
+  if (seed) {
+    return {
+      duplicate: Boolean(existing),
+      telegramStatus: existing?.telegram_status === "sent" ? "sent" : "seeded",
+    };
+  }
+  if (existing?.telegram_status === "sent" || existing?.telegram_status === "seeded") {
+    return {
+      duplicate: true,
+      telegramStatus: existing.telegram_status,
+    };
   }
 
   try {
@@ -187,7 +199,7 @@ export async function ingestInstagramEvent(request: Request, env: Env): Promise<
       )
       .bind(payload.event_key)
       .run();
-    return json({ status: "ok", duplicate: false, telegram_status: "sent" });
+    return { duplicate: false, telegramStatus: "sent" };
   } catch (error) {
     await env.DB
       .prepare(
@@ -202,13 +214,34 @@ export async function ingestInstagramEvent(request: Request, env: Env): Promise<
       eventKey: payload.event_key,
       error: error instanceof Error ? error.message : String(error),
     });
+    throw error;
+  }
+}
+
+export async function ingestInstagramEvent(request: Request, env: Env): Promise<Response> {
+  if (!isAuthorized(request, env)) return json({ detail: "Unauthorized" }, 401);
+  let value: unknown;
+  try {
+    value = await request.json();
+  } catch {
+    return json({ detail: "Invalid JSON" }, 400);
+  }
+  try {
+    const result = await storeInstagramPayload(env, value);
+    return json({
+      status: "ok",
+      duplicate: result.duplicate,
+      telegram_status: result.telegramStatus,
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Invalid payload";
+    const clientError = detail.startsWith("Invalid") ||
+      detail.includes("must use") ||
+      detail.includes("must be") ||
+      detail.includes("Payload");
     return json(
-      {
-        status: "error",
-        telegram_status: "send_failed",
-        detail: error instanceof Error ? error.message : String(error),
-      },
-      502,
+      { status: "error", telegram_status: "send_failed", detail },
+      clientError ? 400 : 502,
     );
   }
 }

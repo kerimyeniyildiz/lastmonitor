@@ -2,7 +2,8 @@ import { parseBoolean } from "./config";
 import { dashboardFeed, dashboardStats } from "./dashboard";
 import { ingestInstagramEvent, ingestInstagramRun } from "./instagram";
 import type { AppConfig, Env } from "./types";
-import { runDueMonitors, sendTelegram } from "./monitor";
+import { runDueMonitors } from "./monitor";
+import { sendTelegram } from "./telegram";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",

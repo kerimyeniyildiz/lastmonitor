@@ -59,6 +59,12 @@
     "SITEMAP_URLS": "https://www.onadimgazetesi.com/sitemap.xml",
     "SITEMAP_MONTHLY_TEMPLATES": "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
     "SITEMAP_MONTH_LOOKBACK": "1",
+    "INSTAGRAM_FLASH_ENABLED": "true",
+    "INSTAGRAM_FLASH_TARGETS": "rozmedyahaber,kirklareli_gundem",
+    "INSTAGRAM_FLASH_INTERVAL_SECONDS": "1800",
+    "INSTAGRAM_SHIFT_ANCHOR": "2026-08-24T08:00:00+03:00",
+    "INSTAGRAM_SHIFT_WORK_HOURS": "18",
+    "INSTAGRAM_SHIFT_CYCLE_HOURS": "48",
     "API_REQUIRE_TOKEN": "true"
   }
 }

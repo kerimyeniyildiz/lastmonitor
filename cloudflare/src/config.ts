@@ -163,5 +163,25 @@ export function loadConfig(env: Env): AppConfig {
       "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
     ]),
     sitemapMonthLookback: Math.max(0, parseInteger(env.SITEMAP_MONTH_LOOKBACK, 1)),
+    instagramFlashEnabled: parseBoolean(env.INSTAGRAM_FLASH_ENABLED, false),
+    instagramFlashTargets: parseList(env.INSTAGRAM_FLASH_TARGETS, [
+      "rozmedyahaber",
+      "kirklareli_gundem",
+    ])
+      .map((username) => username.replace(/^@/, "").toLowerCase())
+      .filter((username) => /^[a-z0-9._]+$/u.test(username)),
+    instagramFlashIntervalSeconds: Math.max(
+      600,
+      parseInteger(env.INSTAGRAM_FLASH_INTERVAL_SECONDS, 1800),
+    ),
+    instagramShiftAnchor: env.INSTAGRAM_SHIFT_ANCHOR || "2026-08-24T08:00:00+03:00",
+    instagramShiftWorkHours: Math.max(
+      1,
+      parseInteger(env.INSTAGRAM_SHIFT_WORK_HOURS, 18),
+    ),
+    instagramShiftCycleHours: Math.max(
+      1,
+      parseInteger(env.INSTAGRAM_SHIFT_CYCLE_HOURS, 48),
+    ),
   };
 }
