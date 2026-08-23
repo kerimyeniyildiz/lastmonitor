@@ -3,6 +3,7 @@ import { loadConfig } from "../src/config";
 import {
   buildNewsMessage,
   buildSitemapUrls,
+  extractNewsMetadata,
   extractNewsTitle,
   isNewsArticleUrl,
   parseSitemapXml,
@@ -46,11 +47,56 @@ describe("sitemap support", () => {
       .toBe("Pınarhisar’da Kartal Park Gün Sayıyor & Açılıyor");
   });
 
+  it("extracts an Open Graph news description", () => {
+    const html = `<!doctype html><html><head>
+      <meta property="og:title" content="Kırklareli'den haber">
+      <meta name="description" content="Daha düşük öncelikli açıklama">
+      <meta property="og:description" content="Kırklareli&#39;ndeki gelişmenin kısa özeti.">
+    </head></html>`;
+    expect(extractNewsMetadata(html)).toEqual({
+      title: "Kırklareli'den haber",
+      description: "Kırklareli'ndeki gelişmenin kısa özeti.",
+    });
+  });
+
+  it("falls back to a shortened JSON-LD article body", () => {
+    const articleBody = "Kırklareli&#39;nde başlayan çalışma hakkında ayrıntılı bilgi paylaşıldı. ".repeat(8);
+    const html = `<html><head>
+      <meta property="og:title" content="Çalışma başladı">
+      <meta property="og:description" content=" &nbsp; ">
+      <script type="application/ld+json">${JSON.stringify({
+        "@type": "NewsArticle",
+        description: "Çalışma başladı",
+        articleBody,
+      })}</script>
+    </head></html>`;
+    const metadata = extractNewsMetadata(html);
+    expect(metadata.description).toContain("Kırklareli'nde başlayan çalışma");
+    expect(metadata.description?.endsWith("...")).toBe(true);
+    expect(metadata.description?.length).toBeLessThanOrEqual(243);
+  });
+
+  it("reads article bodies from invalid JSON-LD with literal line breaks", () => {
+    const html = `<html><head>
+      <meta property="og:title" content="Yeni sanat yuvası">
+      <script type="application/ld+json">{
+        "@type":"NewsArticle",
+        "articleBody":"Kırklareli'nde yeni sanat merkezi açıldı.
+        Merkez farklı etkinliklere ev sahipliği yapacak.",
+        "description":"Yeni sanat yuvası"
+      }</script>
+    </head></html>`;
+    expect(extractNewsMetadata(html).description).toBe(
+      "Kırklareli'nde yeni sanat merkezi açıldı. Merkez farklı etkinliklere ev sahipliği yapacak.",
+    );
+  });
+
   it("includes the real title in Telegram news messages", () => {
     const message = buildNewsMessage({
       link: "https://example.com/kirklareli-haberi",
       source: "example.com",
       title: "Kırklareli'de Şampiyonluk Sevinci",
+      description: "Kısa haber özeti",
       createdAt: "2026-08-22T12:00:00.000Z",
       sortTimestamp: Date.parse("2026-08-22T12:00:00.000Z"),
     });

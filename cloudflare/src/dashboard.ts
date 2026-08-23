@@ -92,14 +92,14 @@ function feedSource(view: string): string {
   const instagramEventAt = eventTimestampSql("delivered_at");
   const tweets = (status: "sent" | "filtered") => `
     SELECT id AS item_id, 'tweet' AS kind, query, user_handle, user_name,
-           text, link, NULL AS source, delivery_status, filter_reasons,
+           text, NULL AS description, link, NULL AS source, delivery_status, filter_reasons,
            NULL AS preview_url, NULL AS media_url, NULL AS content_type,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${tweetEventAt}) AS display_at
     FROM tweets
     WHERE delivery_status = '${status}'`;
   const news = `
     SELECT id AS item_id, 'news' AS kind, NULL AS query, NULL AS user_handle,
-           NULL AS user_name, title AS text, link, source, delivery_status,
+           NULL AS user_name, title AS text, description, link, source, delivery_status,
            '[]' AS filter_reasons,
            NULL AS preview_url, NULL AS media_url, NULL AS content_type,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${newsEventAt}) AS display_at
@@ -108,7 +108,7 @@ function feedSource(view: string): string {
   const instagram = `
     SELECT id AS item_id, 'instagram' AS kind, NULL AS query,
            username AS user_handle, username AS user_name, caption AS text,
-           link, 'Instagram' AS source, delivery_status, '[]' AS filter_reasons,
+           NULL AS description, link, 'Instagram' AS source, delivery_status, '[]' AS filter_reasons,
            preview_url, media_url,
            content_type,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${instagramEventAt}) AS display_at

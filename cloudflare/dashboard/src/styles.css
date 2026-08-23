@@ -175,6 +175,17 @@ h2, h3, p { letter-spacing: 0; }
 .feed-identity span, .feed-time { color: #79858c; font-size: 10px; }
 .feed-time { white-space: nowrap; }
 .feed-copy { margin: 8px 0 0; color: #2e3940; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.news-description {
+  margin: 5px 0 0;
+  display: -webkit-box;
+  overflow: hidden;
+  color: #68747c;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .instagram-media-trigger {
   position: relative;
   width: min(100%, 420px);

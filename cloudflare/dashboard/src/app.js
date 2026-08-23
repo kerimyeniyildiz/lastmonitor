@@ -204,6 +204,7 @@ function feedItemMarkup(item) {
   const copy = isNews
     ? item.text || titleFromUrl(item.link)
     : item.text || (isInstagram ? "Yeni Instagram içeriği" : "");
+  const newsDescription = isNews ? String(item.description || "").trim() : "";
   const longCopy = copy.length > 360;
   const badge = filtered
     ? reasonLabel(item.filter_reasons) || "Filtrelendi"
@@ -235,6 +236,7 @@ function feedItemMarkup(item) {
             ${item.media_url ? '<span class="media-play-indicator" aria-hidden="true"><i data-lucide="play"></i></span>' : ""}
           </button>` : ""}
         <p class="feed-copy${longCopy ? " is-collapsed" : ""}">${escapeHtml(copy)}</p>
+        ${newsDescription ? `<p class="news-description">${escapeHtml(newsDescription)}</p>` : ""}
         ${longCopy ? '<button class="expand-button" type="button">Devamını göster</button>' : ""}
         <div class="feed-item-footer">
           <span class="source-badge${filtered ? " danger-badge" : ""}">${escapeHtml(badge || (isNews ? "Haber" : "Tweet"))}</span>
@@ -250,7 +252,7 @@ function filteredItems() {
   const needle = state.search.trim().toLocaleLowerCase("tr-TR");
   if (!needle) return state.items;
   return state.items.filter((item) =>
-    [item.text, item.user_name, item.user_handle, item.query, item.source, item.content_type, item.link]
+    [item.text, item.description, item.user_name, item.user_handle, item.query, item.source, item.content_type, item.link]
       .join(" ")
       .toLocaleLowerCase("tr-TR")
       .includes(needle),

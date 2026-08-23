@@ -94,22 +94,46 @@ export async function reserveNews(
   return (result.meta.changes ?? 0) > 0;
 }
 
-export async function getNewsTitle(db: D1Database, link: string): Promise<string | null> {
-  const row = await db
-    .prepare("SELECT title FROM news WHERE link = ?")
-    .bind(link)
-    .first<{ title: string | null }>();
-  return row?.title?.trim() || null;
+export interface StoredNewsMetadata {
+  title: string | null;
+  description: string | null;
+  fetchedAt: string | null;
 }
 
-export async function updateNewsTitle(
+export async function getNewsMetadata(
   db: D1Database,
   link: string,
-  title: string,
+): Promise<StoredNewsMetadata> {
+  const row = await db
+    .prepare("SELECT title, description, metadata_fetched_at FROM news WHERE link = ?")
+    .bind(link)
+    .first<{
+      title: string | null;
+      description: string | null;
+      metadata_fetched_at: string | null;
+    }>();
+  return {
+    title: row?.title?.trim() || null,
+    description: row?.description?.trim() || null,
+    fetchedAt: row?.metadata_fetched_at || null,
+  };
+}
+
+export async function updateNewsMetadata(
+  db: D1Database,
+  link: string,
+  title: string | null,
+  description: string | null,
 ): Promise<void> {
   await db
-    .prepare("UPDATE news SET title = ? WHERE link = ?")
-    .bind(title, link)
+    .prepare(
+      `UPDATE news
+       SET title = COALESCE(?, title),
+           description = ?,
+           metadata_fetched_at = CURRENT_TIMESTAMP
+       WHERE link = ?`,
+    )
+    .bind(title, description, link)
     .run();
 }
 

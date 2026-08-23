@@ -1,17 +1,17 @@
 import type { AppConfig, Env, RunSummary } from "./types";
 import {
   claimSchedule,
-  getNewsTitle,
+  getNewsMetadata,
   recordRun,
   reserveNews,
   reserveTweet,
   updateNewsStatus,
-  updateNewsTitle,
+  updateNewsMetadata,
   updateTweetStatus,
 } from "./database";
 import { evaluateTweetFilter, shouldDropTweet } from "./filter";
 import { runDueInstagramFlash } from "./instagramFlash";
-import { buildNewsMessage, fetchNewsEntries, fetchNewsTitle } from "./sitemap";
+import { buildNewsMessage, fetchNewsEntries, fetchNewsMetadata } from "./sitemap";
 import { sendTelegram } from "./telegram";
 import { buildTweetMessage, fetchLatestTweets } from "./twitter";
 
@@ -99,23 +99,29 @@ export async function runNewsTarget(env: Env, config: AppConfig): Promise<RunSum
     for (const entry of entries) {
       const status = config.deliveryMode === "shadow" ? "shadow" : "pending";
       const reserved = await reserveNews(env.DB, entry, status);
-      let title = entry.title || await getNewsTitle(env.DB, entry.link);
-      if (!title) {
+      const storedMetadata = await getNewsMetadata(env.DB, entry.link);
+      let title = entry.title || storedMetadata.title;
+      let description = entry.description || storedMetadata.description;
+      if (!storedMetadata.fetchedAt) {
         try {
-          title = await fetchNewsTitle(entry.link);
-          if (title) {
-            await updateNewsTitle(env.DB, entry.link, title);
-            console.log("news title stored", { link: entry.link, title });
-          }
+          const metadata = await fetchNewsMetadata(entry.link);
+          title ||= metadata.title;
+          description ||= metadata.description;
+          await updateNewsMetadata(env.DB, entry.link, title, description);
+          console.log("news metadata stored", {
+            link: entry.link,
+            hasTitle: Boolean(title),
+            hasDescription: Boolean(description),
+          });
         } catch (error) {
-          console.warn("news title fetch failed", {
+          console.warn("news metadata fetch failed", {
             link: entry.link,
             error: error instanceof Error ? error.message : String(error),
           });
         }
       }
       if (!reserved) continue;
-      const enrichedEntry = { ...entry, title };
+      const enrichedEntry = { ...entry, title, description };
       if (config.deliveryMode === "shadow") {
         newCount += 1;
         console.log("news shadow", { link: entry.link });

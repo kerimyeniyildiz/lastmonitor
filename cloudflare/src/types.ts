@@ -83,6 +83,7 @@ export interface NewsEntry {
   link: string;
   source: string;
   title: string | null;
+  description: string | null;
   createdAt: string | null;
   sortTimestamp: number;
 }
