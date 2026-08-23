@@ -139,6 +139,9 @@ FlashAPI aynı RapidAPI hesabındaki `RAPIDAPI_KEY` secret'ını kullanır. Kull
 D1'de önbelleğe alındıktan sonra her hedef ve kontrol için bir gönderi, bir story isteği
 yapılır. Görseller indirilmez veya R2'ye kopyalanmaz; Instagram CDN önizleme bağlantıları
 doğrudan kullanıldığı için süresi dolan eski dashboard görselleri artık açılmayabilir.
+Sabit hesapların profil fotoğrafları da ilk kurulumda birer profil isteğiyle D1'e alınır;
+fotoğrafı bulunan hesap için sonraki cron turlarında profil isteği tekrarlanmaz. X profil
+fotoğrafları ise mevcut arama yanıtlarından okunur ve ek RapidAPI isteği oluşturmaz.
 
 Bildirim medya kuralları:
 

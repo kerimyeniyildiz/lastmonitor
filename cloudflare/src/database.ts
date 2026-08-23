@@ -55,6 +55,25 @@ export async function reserveTweet(
   return (result.meta.changes ?? 0) > 0;
 }
 
+export async function storeTwitterProfile(
+  db: D1Database,
+  userHandle: string,
+  profileImageUrl: string | null,
+): Promise<void> {
+  if (!userHandle || !profileImageUrl) return;
+  await db
+    .prepare(
+      `INSERT INTO twitter_profiles (user_handle, profile_image_url, updated_at)
+       VALUES (?, ?, CURRENT_TIMESTAMP)
+       ON CONFLICT(user_handle) DO UPDATE SET
+         profile_image_url = excluded.profile_image_url,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE twitter_profiles.profile_image_url <> excluded.profile_image_url`,
+    )
+    .bind(userHandle, profileImageUrl)
+    .run();
+}
+
 export async function updateTweetStatus(
   db: D1Database,
   link: string,

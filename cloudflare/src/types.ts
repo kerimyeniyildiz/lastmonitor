@@ -73,6 +73,7 @@ export interface Tweet {
   id: string;
   userHandle: string;
   userName: string;
+  profileImageUrl: string | null;
   text: string;
   createdAt: string | null;
   link: string;

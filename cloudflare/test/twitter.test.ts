@@ -13,11 +13,28 @@ describe("Twitter response normalization", () => {
       tweet_id: "123",
       text: "Kırklareli gündemi",
       created_at: "2026-07-19T20:00:00+03:00",
-      user_info: { screen_name: "haber", name: "Haber" },
+      user_info: {
+        screen_name: "haber",
+        name: "Haber",
+        avatar: "https://pbs.twimg.com/profile_images/123/haber_normal.jpg",
+      },
     });
     expect(result?.link).toBe("https://x.com/haber/status/123");
     expect(result?.userName).toBe("Haber");
+    expect(result?.profileImageUrl).toBe(
+      "https://pbs.twimg.com/profile_images/123/haber_normal.jpg",
+    );
     expect(result?.createdAt).toBe("2026-07-19T17:00:00.000Z");
+  });
+
+  it("rejects profile images outside X image hosts", () => {
+    const result = normalizeTweet({
+      tweet_id: "unsafe-avatar",
+      text: "Kırklareli",
+      username: "haber",
+      avatar: "https://example.com/avatar.jpg",
+    });
+    expect(result?.profileImageUrl).toBeNull();
   });
 
   it("extracts and sorts timeline tweets", () => {

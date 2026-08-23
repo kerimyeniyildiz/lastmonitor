@@ -91,28 +91,36 @@ function feedSource(view: string): string {
   const newsEventAt = eventTimestampSql("delivered_at");
   const instagramEventAt = eventTimestampSql("delivered_at");
   const tweets = (status: "sent" | "filtered") => `
-    SELECT id AS item_id, 'tweet' AS kind, query, user_handle, user_name,
+    SELECT tweets.id AS item_id, 'tweet' AS kind, query, tweets.user_handle, user_name,
            text, NULL AS description, link, NULL AS source, delivery_status, filter_reasons,
            NULL AS preview_url, NULL AS media_url, NULL AS content_type,
+           profiles.profile_image_url,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${tweetEventAt}) AS display_at
     FROM tweets
+    LEFT JOIN twitter_profiles AS profiles
+      ON profiles.user_handle = tweets.user_handle COLLATE NOCASE
     WHERE delivery_status = '${status}'`;
   const news = `
     SELECT id AS item_id, 'news' AS kind, NULL AS query, NULL AS user_handle,
            NULL AS user_name, title AS text, description, link, source, delivery_status,
            '[]' AS filter_reasons,
            NULL AS preview_url, NULL AS media_url, NULL AS content_type,
+           NULL AS profile_image_url,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${newsEventAt}) AS display_at
     FROM news
     WHERE delivery_status = 'sent'`;
   const instagram = `
-    SELECT id AS item_id, 'instagram' AS kind, NULL AS query,
-           username AS user_handle, username AS user_name, caption AS text,
-           NULL AS description, link, 'Instagram' AS source, delivery_status, '[]' AS filter_reasons,
-           preview_url, media_url,
-           content_type,
+    SELECT instagram_events.id AS item_id, 'instagram' AS kind, NULL AS query,
+           instagram_events.username AS user_handle, instagram_events.username AS user_name,
+           instagram_events.caption AS text, NULL AS description, instagram_events.link,
+           'Instagram' AS source, instagram_events.delivery_status, '[]' AS filter_reasons,
+           instagram_events.preview_url, instagram_events.media_url,
+           instagram_events.content_type,
+           profiles.profile_image_url,
            strftime('%Y-%m-%dT%H:%M:%fZ', ${instagramEventAt}) AS display_at
     FROM instagram_events
+    LEFT JOIN instagram_flash_profiles AS profiles
+      ON profiles.username = instagram_events.username COLLATE NOCASE
     WHERE delivery_status = 'sent'`;
   if (view === "tweets") return tweets("sent");
   if (view === "news") return news;

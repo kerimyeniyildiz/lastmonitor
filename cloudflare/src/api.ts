@@ -57,9 +57,13 @@ async function listTweets(requestUrl: URL, env: Env): Promise<Response> {
   const offset = parseOffset(requestUrl.searchParams.get("offset"));
   const result = await env.DB
     .prepare(
-      `SELECT tweet_id, query, user_handle, user_name, text, link,
-              tweet_created_at, delivery_status, filter_reasons, fetched_at
-       FROM tweets ${where}
+      `SELECT tweets.tweet_id, tweets.query, tweets.user_handle, tweets.user_name,
+              tweets.text, tweets.link, tweets.tweet_created_at, tweets.delivery_status,
+              tweets.filter_reasons, tweets.fetched_at, profiles.profile_image_url
+       FROM tweets
+       LEFT JOIN twitter_profiles AS profiles
+         ON profiles.user_handle = tweets.user_handle COLLATE NOCASE
+       ${where}
        ORDER BY COALESCE(tweet_created_at, fetched_at) DESC
        LIMIT ? OFFSET ?`,
     )

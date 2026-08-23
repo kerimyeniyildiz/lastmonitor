@@ -187,6 +187,7 @@ function feedItemMarkup(item) {
         ? "instagram-item"
         : "tweet-item";
   const icon = filtered ? "shield-x" : isNews ? "newspaper" : isInstagram ? "camera" : "bird";
+  const profileImageUrl = !filtered && !isNews ? String(item.profile_image_url || "") : "";
   const identity = isNews
     ? item.source || "Haber kaynağı"
     : item.user_name || item.user_handle || (isInstagram ? "Instagram hesabı" : "X kullanıcısı");
@@ -211,7 +212,10 @@ function feedItemMarkup(item) {
     : "";
   return `
     <article class="feed-item ${itemClass}" data-key="${escapeHtml(itemKey(item))}">
-      <span class="feed-type-icon"><i data-lucide="${icon}"></i></span>
+      <span class="feed-type-icon${profileImageUrl ? " has-profile-image" : ""}">
+        ${profileImageUrl ? `<img class="feed-profile-image" src="${escapeHtml(profileImageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : ""}
+        <i class="profile-image-fallback" data-lucide="${icon}"></i>
+      </span>
       <div class="feed-item-body">
         <div class="feed-item-head">
           <div class="feed-identity"><strong>${escapeHtml(identity)}</strong><span>${escapeHtml(subline)}</span></div>
@@ -508,6 +512,11 @@ elements.newItems.addEventListener("click", () => {
   renderFeed();
   elements.feedScroller.scrollTo({ top: 0, behavior: "smooth" });
 });
+
+elements.feedList.addEventListener("error", (event) => {
+  if (!event.target.matches?.(".feed-profile-image")) return;
+  event.target.closest(".feed-type-icon")?.classList.add("profile-image-failed");
+}, true);
 
 elements.feedList.addEventListener("click", (event) => {
   const mediaTrigger = event.target.closest(".instagram-media-trigger");

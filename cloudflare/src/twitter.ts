@@ -12,6 +12,20 @@ function firstString(...values: unknown[]): string {
   return "";
 }
 
+function twitterProfileImageUrl(...values: unknown[]): string | null {
+  const value = firstString(...values);
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:" && (host === "twimg.com" || host.endsWith(".twimg.com"))
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function parseDate(value: unknown): Date | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
   if (typeof value === "number") {
@@ -31,7 +45,7 @@ export function parseDate(value: unknown): Date | null {
 export function normalizeTweet(rawValue: unknown): Tweet | null {
   const raw = asRecord(rawValue);
   if (!raw) return null;
-  const user = asRecord(raw.user_info) ?? asRecord(raw.user) ?? {};
+  const user = asRecord(raw.user_info) ?? asRecord(raw.user) ?? asRecord(raw.author) ?? {};
   const id = firstString(
     raw.tweet_id,
     raw.id_str,
@@ -47,6 +61,16 @@ export function normalizeTweet(rawValue: unknown): Tweet | null {
     user.username,
   );
   const userName = firstString(raw.name, user.name, userHandle) || "Bilinmiyor";
+  const profileImageUrl = twitterProfileImageUrl(
+    raw.profile_image_url_https,
+    raw.profile_image_url,
+    raw.profilePicture,
+    raw.avatar,
+    user.profile_image_url_https,
+    user.profile_image_url,
+    user.profilePicture,
+    user.avatar,
+  );
   const text = firstString(raw.full_text, raw.text, raw.tweet, raw.content);
   const created = parseDate(raw.created_at ?? raw.date ?? raw.time);
   const link =
@@ -57,6 +81,7 @@ export function normalizeTweet(rawValue: unknown): Tweet | null {
     id: id || link,
     userHandle,
     userName,
+    profileImageUrl,
     text,
     createdAt: created?.toISOString() ?? null,
     sortTimestamp: created?.getTime() ?? 0,

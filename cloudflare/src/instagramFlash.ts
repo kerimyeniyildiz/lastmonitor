@@ -6,6 +6,8 @@ import type { AppConfig, Env, RunSummary } from "./types";
 const RAPIDAPI_HOST = "flashapi1.p.rapidapi.com";
 const REQUEST_GAP_MS = 1_050;
 const MAX_DUE_TARGETS_PER_RUN = 3;
+const MAX_PROFILE_FETCHES_PER_RUN = 3;
+const PROFILE_RETRY_SECONDS = 24 * 60 * 60;
 const HOUR_MS = 3_600_000;
 const MEDIA_SIGNALS = [
   "__typename",
@@ -311,6 +313,44 @@ export function extractFlashUserId(value: unknown, username: string): string | n
   return search(value, 0);
 }
 
+export function extractFlashProfileImage(value: unknown, username: string): string | null {
+  const expected = username.toLowerCase();
+  const matching: JsonRecord[] = [];
+  const others: JsonRecord[] = [];
+  const visited = new WeakSet<object>();
+  const visit = (candidate: unknown, depth: number): void => {
+    if (depth > 8 || candidate === null || typeof candidate !== "object") return;
+    if (visited.has(candidate)) return;
+    visited.add(candidate);
+    if (Array.isArray(candidate)) {
+      candidate.forEach((child) => visit(child, depth + 1));
+      return;
+    }
+    const record = candidate as JsonRecord;
+    const recordUsername = firstString(record.username, record.user_name).toLowerCase();
+    (recordUsername === expected ? matching : others).push(record);
+    Object.values(record).forEach((child) => visit(child, depth + 1));
+  };
+  visit(value, 0);
+  for (const record of [...matching, ...others]) {
+    const hdVersions = Array.isArray(record.hd_profile_pic_versions)
+      ? record.hd_profile_pic_versions
+      : [];
+    const image = safePreviewUrl(firstString(
+      record.profile_pic_url_hd,
+      record.profile_pic_url,
+      record.profile_picture,
+      record.profilePicture,
+      record.avatar_url,
+      record.avatar,
+      nested(record, "hd_profile_pic_url_info", "url"),
+      nested(hdVersions[0], "url"),
+    ));
+    if (image) return image;
+  }
+  return null;
+}
+
 function apiError(value: unknown): string | null {
   const record = asRecord(value);
   if (!record) return null;
@@ -364,6 +404,10 @@ class FlashApiClient {
     return userId;
   }
 
+  profile(username: string): Promise<unknown> {
+    return this.get("/ig/info_username/", { user: username, nocors: "false" });
+  }
+
   posts(username: string): Promise<unknown> {
     return this.get("/ig/posts_username/", { user: username, nocors: "false" });
   }
@@ -406,6 +450,82 @@ async function storeUserId(db: D1Database, username: string, userId: string): Pr
     )
     .bind(username, userId)
     .run();
+}
+
+interface CachedInstagramProfile {
+  userId: string | null;
+  profileImageUrl: string | null;
+}
+
+async function cachedInstagramProfiles(
+  db: D1Database,
+): Promise<Map<string, CachedInstagramProfile>> {
+  const result = await db
+    .prepare("SELECT username, user_id, profile_image_url FROM instagram_flash_profiles")
+    .all<{ username: string; user_id: string; profile_image_url: string | null }>();
+  return new Map(result.results.map((row) => [row.username.toLowerCase(), {
+    userId: row.user_id || null,
+    profileImageUrl: row.profile_image_url || null,
+  }]));
+}
+
+async function storeInstagramProfile(
+  db: D1Database,
+  username: string,
+  userId: string,
+  profileImageUrl: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO instagram_flash_profiles (
+         username, user_id, profile_image_url, profile_image_fetched_at, updated_at
+       ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       ON CONFLICT(username) DO UPDATE SET
+         user_id = excluded.user_id,
+         profile_image_url = excluded.profile_image_url,
+         profile_image_fetched_at = CURRENT_TIMESTAMP,
+         updated_at = CURRENT_TIMESTAMP`,
+    )
+    .bind(username, userId, profileImageUrl)
+    .run();
+}
+
+async function backfillInstagramProfiles(
+  env: Env,
+  client: FlashApiClient,
+  usernames: string[],
+): Promise<void> {
+  const cached = await cachedInstagramProfiles(env.DB);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  let fetched = 0;
+  for (const username of usernames) {
+    if (fetched >= MAX_PROFILE_FETCHES_PER_RUN) break;
+    const existing = cached.get(username.toLowerCase());
+    if (existing?.profileImageUrl) continue;
+    const due = await claimSchedule(
+      env.DB,
+      `instagram:profile:${username}`,
+      nowSeconds,
+      PROFILE_RETRY_SECONDS,
+    );
+    if (!due) continue;
+    fetched += 1;
+    try {
+      const value = await client.profile(username);
+      const userId = extractFlashUserId(value, username) || existing?.userId;
+      const profileImageUrl = extractFlashProfileImage(value, username);
+      if (!userId || !profileImageUrl) {
+        throw new Error(`FlashAPI profile data missing for @${username}`);
+      }
+      await storeInstagramProfile(env.DB, username, userId, profileImageUrl);
+      console.log("instagram profile stored", { username });
+    } catch (error) {
+      console.warn("instagram profile fetch failed", {
+        username,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 }
 
 async function groupState(
@@ -546,6 +666,12 @@ export async function runDueInstagramFlash(
   force = false,
 ): Promise<RunSummary[]> {
   if (!config.instagramFlashEnabled || !config.instagramFlashTargetSchedule.length) return [];
+  const client = new FlashApiClient(env);
+  await backfillInstagramProfiles(
+    env,
+    client,
+    config.instagramFlashTargetSchedule.map(({ username }) => username),
+  );
   if (!force && !isInstagramShiftActive(new Date(), config)) return [];
 
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -560,7 +686,6 @@ export async function runDueInstagramFlash(
     );
     if (due) dueTargets.push(username);
   }
-  const client = new FlashApiClient(env);
   const summaries: RunSummary[] = [];
   for (const username of dueTargets) {
     summaries.push(await runFlashTarget(env, client, username));

@@ -10,6 +10,7 @@ function tweet(handle: string, name: string, text: string): Tweet {
     id: "1",
     userHandle: handle,
     userName: name,
+    profileImageUrl: null,
     text: `${text} https://t.co/example`,
     createdAt: "2026-07-19T17:00:00.000Z",
     sortTimestamp: 1,

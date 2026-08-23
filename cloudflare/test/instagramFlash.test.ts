@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseInstagramFlashTargetSchedule } from "../src/config";
 import {
   extractFlashUserId,
+  extractFlashProfileImage,
   isInstagramShiftActive,
   normalizeFlashInstagram,
   parseFlashJson,
@@ -59,6 +60,22 @@ describe("FlashAPI Instagram support", () => {
       .toBe("123456789");
     expect(extractFlashUserId({ user: { username: "kirklareli_gundem", pk: 987654 } }, "kirklareli_gundem"))
       .toBe("987654");
+  });
+
+  it("extracts a safe profile image from Instagram user info", () => {
+    const profile = {
+      data: {
+        user: {
+          pk: "123456789",
+          username: "rozmedyahaber",
+          profile_pic_url_hd: "https://scontent.cdninstagram.com/profile.jpg",
+        },
+      },
+    };
+    expect(extractFlashProfileImage(profile, "rozmedyahaber"))
+      .toBe("https://scontent.cdninstagram.com/profile.jpg");
+    expect(extractFlashProfileImage({ profile_pic_url: "https://example.com/a.jpg" }, "rozmedyahaber"))
+      .toBeNull();
   });
 
   it("normalizes posts, reels and carousel covers", () => {

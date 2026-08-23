@@ -6,6 +6,7 @@ import {
   recordRun,
   reserveNews,
   reserveTweet,
+  storeTwitterProfile,
   updateNewsStatus,
   updateNewsMetadata,
   updateTweetStatus,
@@ -29,6 +30,7 @@ export async function runTweetTarget(
     const tweets = await fetchLatestTweets(env, config, query);
     fetchedCount = tweets.length;
     for (const tweet of tweets) {
+      await storeTwitterProfile(env.DB, tweet.userHandle, tweet.profileImageUrl);
       const reasons = evaluateTweetFilter(config, query, tweet);
       const requiredPrefixMissing = reasons.includes("required_prefix_missing");
       const filtered = requiredPrefixMissing ||
