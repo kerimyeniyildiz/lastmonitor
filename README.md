@@ -92,15 +92,19 @@ Filtre nedenlerinde `blocked_term:*` ve `block_pattern:*` Telegram'a gönderilme
 
 Lüleburgaz sorgusunda gözlenen otomatik reklam kampanyası ayrıca birleşik sinyallerle süzülür. Uzun rakam dizili kullanıcı adı, konum, medya bağlantısı, tek kelimelik görünen ad ve kısa artık metin birlikteyse kısa kalıp düşürülür. `BİLGİ-PROFİLDE`, `İLETİŞİM-PROFİLDE` ve kısaltılmış yazımları gibi reklam profil adları URL bulunmasa da yoğun konum listesiyle beraber değerlendirilir. Yetişkin ilanlarında ise yalnızca yetişkin içerik sinyali ile `var mı`, `yazın`, `arıyorum`, `beklerim` gibi doğrudan çağrıların birleşimi engellenir; `aktif` gibi gündelik kullanımı olan sözcükler tek başına yeterli değildir.
 
-Haber kaynakları varsayılan olarak iki sitemap kullanır:
+Haber kaynakları varsayılan olarak dört sitemap kullanır. Aylık sitemaplerde mevcut ayla
+birlikte önceki ay da kontrol edilir:
 
 ```env
-SITEMAP_URLS=https://www.onadimgazetesi.com/sitemap.xml
-SITEMAP_MONTHLY_TEMPLATES=https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml
+SITEMAP_URLS=https://www.onadimgazetesi.com/sitemap.xml,https://www.mansethabergazetesi.com/sitemap.xml/haberler
+SITEMAP_MONTHLY_TEMPLATES=https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml,https://www.kirklareligazetesi.com.tr/sitemap/sitemap-{YYYY}-{MM}.xml
 SITEMAP_MONTH_LOOKBACK=1
 ```
 
 `SITEMAP_MONTHLY_TEMPLATES` içindeki `{YYYY}` ve `{MM}` alanları otomatik doldurulur. `SITEMAP_MONTH_LOOKBACK=1` ay başlarında önceki ayın sitemap'ini de kontrol eder. Eski uzaktan liste dosyası akışı gerekiyorsa `SITEMAP_LIST_URL` tanımlanabilir; doğrudan sitemap ayarları varsa öncelik onlardadır.
+`NEWS_LIMIT` her kaynak için ayrı uygulanır. Yeni eklenen bir kaynağın ilk taramasındaki
+mevcut haberler sessiz başlangıç olarak kaydedilir; sonraki yeni haberler normal biçimde
+Telegram'a ve dashboarda teslim edilir.
 
 ## Cloudflare Instagram İzleyicisi
 

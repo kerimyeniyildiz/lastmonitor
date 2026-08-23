@@ -1,6 +1,7 @@
 import type { AppConfig, Env, RunSummary } from "./types";
 import {
   claimSchedule,
+  getKnownNewsSources,
   getNewsMetadata,
   recordRun,
   reserveNews,
@@ -95,10 +96,21 @@ export async function runNewsTarget(env: Env, config: AppConfig): Promise<RunSum
   let newCount = 0;
   try {
     const entries = await fetchNewsEntries(config);
+    const knownSources = await getKnownNewsSources(env.DB);
+    const seededSources = new Set<string>();
     fetchedCount = entries.length;
     for (const entry of entries) {
-      const status = config.deliveryMode === "shadow" ? "shadow" : "pending";
+      const seedSource = !knownSources.has(entry.source);
+      const status = seedSource
+        ? "seeded"
+        : config.deliveryMode === "shadow"
+          ? "shadow"
+          : "pending";
       const reserved = await reserveNews(env.DB, entry, status);
+      if (seedSource) {
+        if (reserved) seededSources.add(entry.source);
+        continue;
+      }
       const storedMetadata = await getNewsMetadata(env.DB, entry.link);
       let title = entry.title || storedMetadata.title;
       let description = entry.description || storedMetadata.description;
@@ -135,6 +147,9 @@ export async function runNewsTarget(env: Env, config: AppConfig): Promise<RunSum
         await updateNewsStatus(env.DB, entry.link, "send_failed");
         throw error;
       }
+    }
+    if (seededSources.size > 0) {
+      console.log("news sources seeded", { sources: [...seededSources] });
     }
     const summary: RunSummary = {
       kind: "news",

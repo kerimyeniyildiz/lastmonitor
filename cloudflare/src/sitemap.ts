@@ -140,6 +140,16 @@ function looseJsonLdValue(html: string, key: "description" | "articleBody"): str
   }
 }
 
+function articleParagraphs(html: string): string[] {
+  const container = /<(?:article|div)\b[^>]*class\s*=\s*(?:"[^"]*\bnews-detail\b[^"]*"|'[^']*\bnews-detail\b[^']*')[^>]*>/iu.exec(html);
+  if (!container) return [];
+  const content = html.slice(container.index + container[0].length, container.index + 30_000);
+  return [...content.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/giu)]
+    .map((match) => match[1])
+    .filter(Boolean)
+    .slice(0, 10);
+}
+
 export function extractNewsMetadata(html: string): NewsMetadata {
   const candidates = new Map<string, string>();
   for (const tag of html.match(/<meta\b[^>]*>/giu) ?? []) {
@@ -178,6 +188,7 @@ export function extractNewsMetadata(html: string): NewsMetadata {
     candidates.get("twitter:description") ?? "",
     jsonDescription,
     articleBody,
+    ...articleParagraphs(html),
   ];
   const normalizedTitle = title?.toLocaleLowerCase("tr-TR") ?? "";
   const description = descriptions
@@ -302,9 +313,21 @@ export async function fetchNewsEntries(config: AppConfig): Promise<NewsEntry[]> 
       sortTimestamp: created?.getTime() ?? 0,
     });
   }
-  return [...unique.values()]
-    .sort((left, right) => right.sortTimestamp - left.sortTimestamp)
-    .slice(0, config.newsLimit);
+  return limitNewsEntriesPerSource([...unique.values()], config.newsLimit);
+}
+
+export function limitNewsEntriesPerSource(entries: NewsEntry[], limit: number): NewsEntry[] {
+  const grouped = new Map<string, NewsEntry[]>();
+  for (const entry of entries) {
+    const sourceEntries = grouped.get(entry.source) ?? [];
+    sourceEntries.push(entry);
+    grouped.set(entry.source, sourceEntries);
+  }
+  return [...grouped.values()]
+    .flatMap((sourceEntries) => sourceEntries
+      .sort((left, right) => right.sortTimestamp - left.sortTimestamp)
+      .slice(0, limit))
+    .sort((left, right) => right.sortTimestamp - left.sortTimestamp);
 }
 
 export function buildNewsMessage(entry: NewsEntry): string {

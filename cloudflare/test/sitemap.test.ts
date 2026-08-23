@@ -6,9 +6,10 @@ import {
   extractNewsMetadata,
   extractNewsTitle,
   isNewsArticleUrl,
+  limitNewsEntriesPerSource,
   parseSitemapXml,
 } from "../src/sitemap";
-import type { Env } from "../src/types";
+import type { Env, NewsEntry } from "../src/types";
 
 describe("sitemap support", () => {
   it("parses URL sets", () => {
@@ -26,6 +27,8 @@ describe("sitemap support", () => {
     const urls = buildSitemapUrls(config, new Date("2026-07-19T00:00:00Z"));
     expect(urls).toContain("https://www.alternatifgazetesi.com/sitemap/sitemap-2026-07.xml");
     expect(urls).toContain("https://www.alternatifgazetesi.com/sitemap/sitemap-2026-06.xml");
+    expect(urls).toContain("https://www.kirklareligazetesi.com.tr/sitemap/sitemap-2026-07.xml");
+    expect(urls).toContain("https://www.kirklareligazetesi.com.tr/sitemap/sitemap-2026-06.xml");
   });
 
   it("keeps homepages and media files out of the article limit", () => {
@@ -89,6 +92,46 @@ describe("sitemap support", () => {
     expect(extractNewsMetadata(html).description).toBe(
       "Kırklareli'nde yeni sanat merkezi açıldı. Merkez farklı etkinliklere ev sahipliği yapacak.",
     );
+  });
+
+  it("uses the first meaningful paragraph from a news-detail container", () => {
+    const html = `<html><head>
+      <meta property="og:title" content="Konakta sanat kapıları açıldı">
+      <meta property="og:description" content="">
+    </head><body>
+      <div class="news-detail col-12">
+        <p>&nbsp;</p>
+        <p>Kırklareli'nde düzenlenen açılış töreni sanatseverleri bir araya getirdi.</p>
+      </div>
+    </body></html>`;
+    expect(extractNewsMetadata(html).description).toBe(
+      "Kırklareli'nde düzenlenen açılış töreni sanatseverleri bir araya getirdi.",
+    );
+  });
+
+  it("applies the news limit independently to every source", () => {
+    const entry = (source: string, id: number, timestamp: number): NewsEntry => ({
+      link: `https://${source}/haber-${id}`,
+      source,
+      title: null,
+      description: null,
+      createdAt: new Date(timestamp).toISOString(),
+      sortTimestamp: timestamp,
+    });
+    const entries = [
+      entry("busy.example", 1, 500),
+      entry("busy.example", 2, 400),
+      entry("busy.example", 3, 300),
+      entry("daily.example", 1, 200),
+      entry("daily.example", 2, 100),
+    ];
+    const limited = limitNewsEntriesPerSource(entries, 2);
+    expect(limited.map((item) => item.link)).toEqual([
+      "https://busy.example/haber-1",
+      "https://busy.example/haber-2",
+      "https://daily.example/haber-1",
+      "https://daily.example/haber-2",
+    ]);
   });
 
   it("includes the real title in Telegram news messages", () => {

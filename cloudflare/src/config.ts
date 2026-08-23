@@ -201,9 +201,11 @@ export function loadConfig(env: Env): AppConfig {
     newsIntervalSeconds: Math.max(60, parseInteger(env.NEWS_INTERVAL_SECONDS, 600)),
     sitemapUrls: parseList(env.SITEMAP_URLS, [
       "https://www.onadimgazetesi.com/sitemap.xml",
+      "https://www.mansethabergazetesi.com/sitemap.xml/haberler",
     ]),
     sitemapMonthlyTemplates: parseList(env.SITEMAP_MONTHLY_TEMPLATES, [
       "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
+      "https://www.kirklareligazetesi.com.tr/sitemap/sitemap-{YYYY}-{MM}.xml",
     ]),
     sitemapMonthLookback: Math.max(0, parseInteger(env.SITEMAP_MONTH_LOOKBACK, 1)),
     instagramFlashEnabled: parseBoolean(env.INSTAGRAM_FLASH_ENABLED, false),

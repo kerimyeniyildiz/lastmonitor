@@ -94,6 +94,13 @@ export async function reserveNews(
   return (result.meta.changes ?? 0) > 0;
 }
 
+export async function getKnownNewsSources(db: D1Database): Promise<Set<string>> {
+  const result = await db
+    .prepare("SELECT DISTINCT source FROM news WHERE source IS NOT NULL AND source <> ''")
+    .all<{ source: string }>();
+  return new Set(result.results.map((row) => row.source));
+}
+
 export interface StoredNewsMetadata {
   title: string | null;
   description: string | null;
