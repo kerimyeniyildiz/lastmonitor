@@ -36,6 +36,11 @@ interface NormalizedPayload {
   sortTimestamp: number;
 }
 
+interface InstagramGroupState {
+  initialized: boolean;
+  latestContentAt: number;
+}
+
 export function parseFlashJson(text: string): unknown {
   return flashJson.parse(text);
 }
@@ -383,33 +388,51 @@ async function storeUserId(db: D1Database, username: string, userId: string): Pr
     .run();
 }
 
-async function groupInitialized(
+async function groupState(
   db: D1Database,
   username: string,
   group: InstagramGroup,
-): Promise<boolean> {
+): Promise<InstagramGroupState> {
   const row = await db
     .prepare(
-      "SELECT 1 AS initialized FROM instagram_flash_groups WHERE username = ? AND group_name = ?",
+      `SELECT 1 AS initialized, latest_content_at
+       FROM instagram_flash_groups WHERE username = ? AND group_name = ?`,
     )
     .bind(username, group)
-    .first<{ initialized: number }>();
-  return Boolean(row?.initialized);
+    .first<{ initialized: number; latest_content_at: number }>();
+  return {
+    initialized: Boolean(row?.initialized),
+    latestContentAt: Math.max(0, Number(row?.latest_content_at) || 0),
+  };
 }
 
-async function markGroupInitialized(
+async function updateGroupState(
   db: D1Database,
   username: string,
   group: InstagramGroup,
+  latestContentAt: number,
 ): Promise<void> {
   await db
     .prepare(
-      `INSERT INTO instagram_flash_groups (username, group_name, initialized_at)
-       VALUES (?, ?, CURRENT_TIMESTAMP)
-       ON CONFLICT(username, group_name) DO NOTHING`,
+      `INSERT INTO instagram_flash_groups (
+         username, group_name, initialized_at, latest_content_at
+       ) VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+       ON CONFLICT(username, group_name) DO UPDATE SET
+         latest_content_at = MAX(instagram_flash_groups.latest_content_at, excluded.latest_content_at)`,
     )
-    .bind(username, group)
+    .bind(username, group, Math.max(0, Math.floor(latestContentAt)))
     .run();
+}
+
+export function shouldSeedFlashEvent(
+  initialized: boolean,
+  latestContentAt: number,
+  createdAt: string | null,
+): boolean {
+  if (!initialized) return true;
+  if (latestContentAt <= 0) return false;
+  const timestamp = createdAt ? Date.parse(createdAt) : Number.NaN;
+  return !Number.isFinite(timestamp) || timestamp <= latestContentAt;
 }
 
 async function processGroup(
@@ -418,15 +441,23 @@ async function processGroup(
   group: InstagramGroup,
   events: InstagramPayload[],
 ): Promise<{ delivered: number; seeded: number }> {
-  const initialized = await groupInitialized(env.DB, username, group);
+  const state = await groupState(env.DB, username, group);
   let delivered = 0;
   let seeded = 0;
+  let latestContentAt = state.latestContentAt;
   for (const event of events) {
-    const result = await storeInstagramPayload(env, event, !initialized);
-    if (!initialized && !result.duplicate) seeded += 1;
-    if (initialized && !result.duplicate && result.telegramStatus === "sent") delivered += 1;
+    const timestamp = event.created_at ? Date.parse(event.created_at) : Number.NaN;
+    const seed = shouldSeedFlashEvent(
+      state.initialized,
+      state.latestContentAt,
+      event.created_at,
+    );
+    const result = await storeInstagramPayload(env, event, seed);
+    if (seed && !result.duplicate) seeded += 1;
+    if (!seed && !result.duplicate && result.telegramStatus === "sent") delivered += 1;
+    if (Number.isFinite(timestamp)) latestContentAt = Math.max(latestContentAt, timestamp);
   }
-  if (!initialized) await markGroupInitialized(env.DB, username, group);
+  await updateGroupState(env.DB, username, group, latestContentAt);
   return { delivered, seeded };
 }
 

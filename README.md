@@ -112,9 +112,10 @@ Takip için Instagram kullanıcı adı, şifresi, session veya yerel bilgisayar 
 İzleyici `2026-08-24 08:00 Europe/Istanbul` başlangıcından itibaren 48 saatlik döngünün
 ilk 18 saatinde çalışır. Böylece 24 Ağustos 08:00-25 Ağustos 02:00 çalışma penceresinden
 sonra 30 saat bekler ve 26 Ağustos 08:00'de yeniden başlar. İlk başarılı kontrolde bulunan
-mevcut içerikler `seeded` olarak D1'e kaydedilir ve Telegram'a topluca gönderilmez. Sonraki
-kontrollerde yalnızca yeni içerikler ortak Instagram teslimat hattından Telegram'a ve
-dashboard canlı akışına eklenir.
+mevcut içerikler `seeded` olarak D1'e kaydedilir ve Telegram'a topluca gönderilmez. Hesap
+ve akış türü başına son içerik zamanı da saklanır; API'nin daha sonraki bir yanıtta gösterdiği
+eski içerikler yeni sanılmaz. Sonraki kontrollerde yalnızca gerçekten daha yeni içerikler
+ortak Instagram teslimat hattından Telegram'a ve dashboard canlı akışına eklenir.
 
 ```env
 INSTAGRAM_FLASH_ENABLED=true

@@ -4,6 +4,7 @@ import {
   isInstagramShiftActive,
   normalizeFlashInstagram,
   parseFlashJson,
+  shouldSeedFlashEvent,
 } from "../src/instagramFlash";
 import type { AppConfig } from "../src/types";
 
@@ -95,6 +96,14 @@ describe("FlashAPI Instagram support", () => {
       instagram_id: "3969497835019712179",
       link: "https://www.instagram.com/stories/rozmedyahaber/3969497835019712179/",
     });
+  });
+
+  it("silently stores old media that appears after the initial snapshot", () => {
+    const watermark = Date.parse("2026-08-22T12:00:00.000Z");
+
+    expect(shouldSeedFlashEvent(false, 0, "2026-08-22T12:00:00.000Z")).toBe(true);
+    expect(shouldSeedFlashEvent(true, watermark, "2026-08-21T12:00:00.000Z")).toBe(true);
+    expect(shouldSeedFlashEvent(true, watermark, "2026-08-22T12:00:01.000Z")).toBe(false);
   });
 
   it("normalizes nested story responses as cover-only events", () => {
