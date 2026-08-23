@@ -61,8 +61,14 @@ export async function updateTweetStatus(
   status: string,
 ): Promise<void> {
   await db
-    .prepare("UPDATE tweets SET delivery_status = ?, fetched_at = CURRENT_TIMESTAMP WHERE link = ?")
-    .bind(status, link)
+    .prepare(
+      `UPDATE tweets
+       SET delivery_status = ?,
+           delivered_at = CASE WHEN ? = 'sent' THEN CURRENT_TIMESTAMP ELSE delivered_at END,
+           fetched_at = CURRENT_TIMESTAMP
+       WHERE link = ?`,
+    )
+    .bind(status, status, link)
     .run();
 }
 
@@ -113,8 +119,14 @@ export async function updateNewsStatus(
   status: string,
 ): Promise<void> {
   await db
-    .prepare("UPDATE news SET delivery_status = ?, fetched_at = CURRENT_TIMESTAMP WHERE link = ?")
-    .bind(status, link)
+    .prepare(
+      `UPDATE news
+       SET delivery_status = ?,
+           delivered_at = CASE WHEN ? = 'sent' THEN CURRENT_TIMESTAMP ELSE delivered_at END,
+           fetched_at = CURRENT_TIMESTAMP
+       WHERE link = ?`,
+    )
+    .bind(status, status, link)
     .run();
 }
 
