@@ -5,6 +5,7 @@ import type { AppConfig, Env, RunSummary } from "./types";
 
 const RAPIDAPI_HOST = "flashapi1.p.rapidapi.com";
 const REQUEST_GAP_MS = 1_050;
+const MAX_DUE_TARGETS_PER_RUN = 3;
 const HOUR_MS = 3_600_000;
 const MEDIA_SIGNALS = [
   "__typename",
@@ -544,17 +545,18 @@ export async function runDueInstagramFlash(
   config: AppConfig,
   force = false,
 ): Promise<RunSummary[]> {
-  if (!config.instagramFlashEnabled || !config.instagramFlashTargets.length) return [];
+  if (!config.instagramFlashEnabled || !config.instagramFlashTargetSchedule.length) return [];
   if (!force && !isInstagramShiftActive(new Date(), config)) return [];
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   const dueTargets: string[] = [];
-  for (const username of config.instagramFlashTargets) {
+  for (const { username, intervalSeconds } of config.instagramFlashTargetSchedule) {
+    if (dueTargets.length >= MAX_DUE_TARGETS_PER_RUN) break;
     const due = force || await claimSchedule(
       env.DB,
       `instagram:flash:${username}`,
       nowSeconds,
-      config.instagramFlashIntervalSeconds,
+      intervalSeconds,
     );
     if (due) dueTargets.push(username);
   }

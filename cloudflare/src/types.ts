@@ -23,6 +23,7 @@ export interface Env {
   SITEMAP_MONTHLY_TEMPLATES?: string;
   SITEMAP_MONTH_LOOKBACK?: string;
   INSTAGRAM_FLASH_ENABLED?: string;
+  INSTAGRAM_FLASH_TARGET_SCHEDULE?: string;
   INSTAGRAM_FLASH_TARGETS?: string;
   INSTAGRAM_FLASH_INTERVAL_SECONDS?: string;
   INSTAGRAM_SHIFT_ANCHOR?: string;
@@ -33,6 +34,11 @@ export interface Env {
 
 export interface QuerySchedule {
   query: string;
+  intervalSeconds: number;
+}
+
+export interface InstagramFlashTarget {
+  username: string;
   intervalSeconds: number;
 }
 
@@ -55,6 +61,7 @@ export interface AppConfig {
   sitemapMonthlyTemplates: string[];
   sitemapMonthLookback: number;
   instagramFlashEnabled: boolean;
+  instagramFlashTargetSchedule: InstagramFlashTarget[];
   instagramFlashTargets: string[];
   instagramFlashIntervalSeconds: number;
   instagramShiftAnchor: string;

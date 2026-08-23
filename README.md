@@ -119,12 +119,17 @@ ortak Instagram teslimat hattından Telegram'a ve dashboard canlı akışına ek
 
 ```env
 INSTAGRAM_FLASH_ENABLED=true
+INSTAGRAM_FLASH_TARGET_SCHEDULE=rozmedyahaber|30m,kirklareli_gundem|30m,kirklareli_bugun|60m
 INSTAGRAM_FLASH_TARGETS=rozmedyahaber,kirklareli_gundem
 INSTAGRAM_FLASH_INTERVAL_SECONDS=1800
 INSTAGRAM_SHIFT_ANCHOR=2026-08-24T08:00:00+03:00
 INSTAGRAM_SHIFT_WORK_HOURS=18
 INSTAGRAM_SHIFT_CYCLE_HOURS=48
 ```
+
+`INSTAGRAM_FLASH_TARGET_SCHEDULE` tanımlandığında hesap başına aralıkları kullanır ve
+eski `INSTAGRAM_FLASH_TARGETS` / `INSTAGRAM_FLASH_INTERVAL_SECONDS` ayarlarının önüne
+geçer. En kısa aralık 10 dakikadır.
 
 FlashAPI aynı RapidAPI hesabındaki `RAPIDAPI_KEY` secret'ını kullanır. Kullanıcı kimlikleri
 D1'de önbelleğe alındıktan sonra her hedef ve kontrol için bir gönderi, bir story isteği

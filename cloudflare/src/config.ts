@@ -1,4 +1,9 @@
-import type { AppConfig, Env, QuerySchedule } from "./types";
+import type {
+  AppConfig,
+  Env,
+  InstagramFlashTarget,
+  QuerySchedule,
+} from "./types";
 
 export const DEFAULT_BLOCKED_TWEET_TERMS = [
   "escort",
@@ -128,9 +133,47 @@ export function parseQuerySchedule(value: string | undefined): QuerySchedule[] {
     .filter((item) => item.query.length > 0);
 }
 
+export function parseInstagramFlashTargetSchedule(
+  value: string | undefined,
+  legacyTargets: string | undefined,
+  legacyInterval: string | undefined,
+): InstagramFlashTarget[] {
+  const fallbackInterval = Math.max(600, parseInteger(legacyInterval, 1800));
+  const entries = value?.trim()
+    ? parseList(value)
+    : parseList(legacyTargets, ["rozmedyahaber", "kirklareli_gundem"])
+        .map((username) => `${username}|${fallbackInterval}s`);
+  const seen = new Set<string>();
+
+  return entries.flatMap((entry) => {
+    const separator = entry.lastIndexOf("|");
+    const rawUsername = separator >= 0 ? entry.slice(0, separator) : entry;
+    const rawInterval = separator >= 0 ? entry.slice(separator + 1) : undefined;
+    const username = rawUsername.trim().replace(/^@/, "").toLowerCase();
+    if (!/^[a-z0-9._]+$/u.test(username) || seen.has(username)) return [];
+    seen.add(username);
+    return [{
+      username,
+      intervalSeconds: Math.max(
+        600,
+        parseDurationSeconds(rawInterval, fallbackInterval),
+      ),
+    }];
+  });
+}
+
 export function loadConfig(env: Env): AppConfig {
   const rawDeliveryMode = (env.DELIVERY_MODE || "shadow").toLowerCase();
   const rawFilterMode = (env.TWEET_FILTER_MODE || "drop").toLowerCase();
+  const instagramFlashIntervalSeconds = Math.max(
+    600,
+    parseInteger(env.INSTAGRAM_FLASH_INTERVAL_SECONDS, 1800),
+  );
+  const instagramFlashTargetSchedule = parseInstagramFlashTargetSchedule(
+    env.INSTAGRAM_FLASH_TARGET_SCHEDULE,
+    env.INSTAGRAM_FLASH_TARGETS,
+    env.INSTAGRAM_FLASH_INTERVAL_SECONDS,
+  );
   return {
     deliveryMode: rawDeliveryMode === "live" ? "live" : "shadow",
     queryType: env.QUERY_TYPE || "Latest",
@@ -164,16 +207,9 @@ export function loadConfig(env: Env): AppConfig {
     ]),
     sitemapMonthLookback: Math.max(0, parseInteger(env.SITEMAP_MONTH_LOOKBACK, 1)),
     instagramFlashEnabled: parseBoolean(env.INSTAGRAM_FLASH_ENABLED, false),
-    instagramFlashTargets: parseList(env.INSTAGRAM_FLASH_TARGETS, [
-      "rozmedyahaber",
-      "kirklareli_gundem",
-    ])
-      .map((username) => username.replace(/^@/, "").toLowerCase())
-      .filter((username) => /^[a-z0-9._]+$/u.test(username)),
-    instagramFlashIntervalSeconds: Math.max(
-      600,
-      parseInteger(env.INSTAGRAM_FLASH_INTERVAL_SECONDS, 1800),
-    ),
+    instagramFlashTargetSchedule,
+    instagramFlashTargets: instagramFlashTargetSchedule.map(({ username }) => username),
+    instagramFlashIntervalSeconds,
     instagramShiftAnchor: env.INSTAGRAM_SHIFT_ANCHOR || "2026-08-24T08:00:00+03:00",
     instagramShiftWorkHours: Math.max(
       1,

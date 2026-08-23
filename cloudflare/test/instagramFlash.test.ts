@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseInstagramFlashTargetSchedule } from "../src/config";
 import {
   extractFlashUserId,
   isInstagramShiftActive,
@@ -15,6 +16,29 @@ const shiftConfig = {
 } as AppConfig;
 
 describe("FlashAPI Instagram support", () => {
+  it("supports per-account intervals and ignores duplicate or invalid targets", () => {
+    expect(parseInstagramFlashTargetSchedule(
+      "@rozmedyahaber|30m,kirklareli_gundem|60m,rozmedyahaber|2h,bad target|30m,kirklarelikusu|120m",
+      undefined,
+      undefined,
+    )).toEqual([
+      { username: "rozmedyahaber", intervalSeconds: 1800 },
+      { username: "kirklareli_gundem", intervalSeconds: 3600 },
+      { username: "kirklarelikusu", intervalSeconds: 7200 },
+    ]);
+  });
+
+  it("keeps the legacy target and interval settings compatible", () => {
+    expect(parseInstagramFlashTargetSchedule(
+      undefined,
+      "rozmedyahaber,kirklareli_gundem",
+      "2700",
+    )).toEqual([
+      { username: "rozmedyahaber", intervalSeconds: 2700 },
+      { username: "kirklareli_gundem", intervalSeconds: 2700 },
+    ]);
+  });
+
   it("follows the 18-hour work and 30-hour off rotation", () => {
     expect(isInstagramShiftActive(new Date("2026-08-23T09:00:00+03:00"), shiftConfig))
       .toBe(false);

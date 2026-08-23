@@ -60,6 +60,7 @@
     "SITEMAP_MONTHLY_TEMPLATES": "https://www.alternatifgazetesi.com/sitemap/sitemap-{YYYY}-{MM}.xml",
     "SITEMAP_MONTH_LOOKBACK": "1",
     "INSTAGRAM_FLASH_ENABLED": "true",
+    "INSTAGRAM_FLASH_TARGET_SCHEDULE": "rozmedyahaber|30m,kirklareli_gundem|30m,kirklareli_bugun|60m,muhabir39|60m,kirklareliherseyburadahaber|60m,tip.kirklareli|60m,gorunumgazetesi|60m,yetkinhazarchp|60m,kirklareligencihh|60m,babaeskimhaber|60m,kirklarelibarosu|60m,ozgurkaya39|60m,kirklarelikusu|120m,klumuhtari|120m,draselmanmihriban|120m,kuzeyormanlarisavunmasi|120m",
     "INSTAGRAM_FLASH_TARGETS": "rozmedyahaber,kirklareli_gundem",
     "INSTAGRAM_FLASH_INTERVAL_SECONDS": "1800",
     "INSTAGRAM_SHIFT_ANCHOR": "2026-08-24T08:00:00+03:00",
