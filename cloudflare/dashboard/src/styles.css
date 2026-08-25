@@ -156,6 +156,22 @@ h2, h3, p { letter-spacing: 0; }
   padding: 13px 8px;
   border-bottom: 1px solid #e4e8ea;
 }
+.feed-item.is-entering {
+  animation: feed-item-enter 600ms cubic-bezier(.22, 1, .36, 1) both;
+  animation-delay: calc(var(--feed-enter-order, 0) * 55ms);
+}
+@keyframes feed-item-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px);
+    background: rgba(20, 125, 114, .075);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    background: transparent;
+  }
+}
 .feed-item:last-child { border-bottom: 0; }
 .feed-type-icon {
   width: 34px;
@@ -448,4 +464,5 @@ body.lightbox-open { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; }
+  .feed-item.is-entering { animation: none !important; }
 }

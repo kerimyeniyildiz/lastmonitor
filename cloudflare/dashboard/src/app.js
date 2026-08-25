@@ -175,7 +175,7 @@ function reasonLabel(reasons) {
     .join(" · ");
 }
 
-function feedItemMarkup(item) {
+function feedItemMarkup(item, enterOrder = null) {
   const filtered = item.delivery_status === "filtered";
   const isNews = item.kind === "news";
   const isInstagram = item.kind === "instagram";
@@ -210,8 +210,12 @@ function feedItemMarkup(item) {
   const filterBadge = filtered
     ? reasonLabel(item.filter_reasons) || "Filtrelendi"
     : "";
+  const isEntering = Number.isInteger(enterOrder);
+  const enterStyle = isEntering
+    ? ` style="--feed-enter-order:${Math.min(enterOrder, 8)}"`
+    : "";
   return `
-    <article class="feed-item ${itemClass}" data-key="${escapeHtml(itemKey(item))}">
+    <article class="feed-item ${itemClass}${isEntering ? " is-entering" : ""}" data-key="${escapeHtml(itemKey(item))}"${enterStyle}>
       <span class="feed-type-icon${profileImageUrl ? " has-profile-image" : ""}">
         ${profileImageUrl ? `<img class="feed-profile-image" src="${escapeHtml(profileImageUrl)}" alt="" loading="lazy" referrerpolicy="no-referrer" />` : ""}
         <i class="profile-image-fallback" data-lucide="${icon}"></i>
@@ -259,9 +263,14 @@ function filteredItems() {
   );
 }
 
-function renderFeed() {
+function renderFeed({ enteringItems = [] } = {}) {
   const items = filteredItems();
-  elements.feedList.innerHTML = items.map(feedItemMarkup).join("");
+  const entranceOrder = new Map(
+    enteringItems.map((item, index) => [itemKey(item), index]),
+  );
+  elements.feedList.innerHTML = items
+    .map((item) => feedItemMarkup(item, entranceOrder.get(itemKey(item)) ?? null))
+    .join("");
   elements.feedEmpty.hidden = items.length > 0;
   elements.feedSummary.textContent = `${formatNumber(state.items.length)} kayıt gösteriliyor`;
   elements.loadMore.hidden = !state.cursor;
@@ -315,9 +324,14 @@ function closeMediaLightbox() {
   lightboxTrigger = null;
 }
 
-function prependFeedItems(items) {
+function prependFeedItems(items, { animate = false } = {}) {
   if (!items.length) return;
-  elements.feedList.insertAdjacentHTML("afterbegin", items.map(feedItemMarkup).join(""));
+  elements.feedList.insertAdjacentHTML(
+    "afterbegin",
+    items
+      .map((item, index) => feedItemMarkup(item, animate ? index : null))
+      .join(""),
+  );
   elements.feedEmpty.hidden = true;
   elements.feedSummary.textContent = `${formatNumber(state.items.length)} kayıt gösteriliyor`;
   renderIcons();
@@ -340,9 +354,9 @@ async function fetchFeed({ append = false, poll = false } = {}) {
       if (state.autoFlow && elements.feedScroller.scrollTop < 80) {
         state.items = [...incoming, ...state.items];
         if (state.search.trim()) {
-          renderFeed();
+          renderFeed({ enteringItems: incoming });
         } else {
-          prependFeedItems(incoming);
+          prependFeedItems(incoming, { animate: true });
         }
         elements.feedScroller.scrollTo({ top: 0, behavior: "smooth" });
       } else {
@@ -506,10 +520,11 @@ elements.autoFlow.addEventListener("click", () => {
 });
 
 elements.newItems.addEventListener("click", () => {
-  state.items = [...state.pendingItems, ...state.items];
+  const pendingItems = state.pendingItems;
+  state.items = [...pendingItems, ...state.items];
   state.pendingItems = [];
   elements.newItems.hidden = true;
-  renderFeed();
+  renderFeed({ enteringItems: pendingItems });
   elements.feedScroller.scrollTo({ top: 0, behavior: "smooth" });
 });
 
